@@ -1,0 +1,158 @@
+/* globals.css */
+
+/* Body / background */
+body {
+  padding-left: 10;
+  padding-right: 10;
+  font-family: 'Inter', sans-serif;
+  background: rgb(91, 91, 91);
+  color: white;
+}
+
+/* Cards */
+.card {
+  background: rgb(17, 255, 0);
+  padding: 1rem;
+  border-radius: 1rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* Buttons */
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  transition: all 0.2s;
+  margin: 0 10px 0 20px; /* top right bottom left */
+}
+
+button.bg-green {
+  background-color: #22c55e;
+  color: white;
+}
+
+button.bg-green:hover {
+  background-color: #16a34a;
+}
+
+button.bg-red {
+  background-color: #ef4444;
+  color: white;
+}
+
+button.bg-red:hover {
+  background-color: #b91c1c;
+}
+
+button.bg-blue {
+  background-color: #3b82f6;
+  color: white;
+}
+
+button.bg-blue:hover {
+  background-color: #2563eb;
+}
+
+button.bg-gray {
+  background-color: #6b7280;
+  color: white;
+}
+
+button.bg-gray:hover {
+  background-color: #4b5563;
+}
+
+/* Inputs */
+input {
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  border: none;
+  font-size: 1rem;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #111827;
+}
+
+/* Badges */
+.badge {
+  background-color: #7c3aed;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+}
+
+/* Headings */
+h1, h2 {
+  font-weight: 800;
+}
+
+h1 {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Layout */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Flex helpers */
+.flex {
+  display: flex;
+}
+
+.flex-gap-2 {
+  gap: 0.5rem;
+}
+
+.flex-gap-4 {
+  gap: 1rem;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-6 {
+  margin-bottom: 1.5rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.rounded-lg {
+  border-radius: 0.75rem;
+}
+
+.rounded-xl {
+  border-radius: 1rem;
+}
