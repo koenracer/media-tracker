@@ -9,6 +9,7 @@ export default function MediaTracker() {
   const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
   const [activeTab, setActiveTab] = useState("watchlist");
+  const [previousTab, setPreviousTab] = useState("watchlist");
   const [loading, setLoading] = useState(true);
   
   // Data lijsten
@@ -20,6 +21,8 @@ export default function MediaTracker() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
 
   // --- 1. DATA OPHALEN UIT SUPABASE ---
   const fetchData = async () => {
@@ -140,14 +143,65 @@ export default function MediaTracker() {
 
   // Update voortgang (tijd/seizoen/aflevering)
   const updateProgress = async (id, field, value) => {
+    // Zorg dat seizoen/episode als nummer behandeld worden
+    const normalizedValue = (field === 'season' || field === 'episode') ? Number(value) : value;
+
     // Update lokale state direct (voor soepel typen)
-    setWatching(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    setWatching(prev => prev.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item));
+
+    // Update geselecteerd item in de edit view als het overeenkomt
+    setSelectedItem(prev => prev && prev.id === id ? { ...prev, [field]: normalizedValue } : prev);
 
     // Update database (met debounce zou beter zijn, maar dit werkt voor nu)
+    try {
+      await supabase
+        .from('media_items')
+        .update({ [field]: normalizedValue })
+        .eq('id', id);
+    } catch (err) {
+      console.error('Fout bij updaten voortgang:', err);
+    }
+  };
+
+  // Modal handler voor meerdere velden tegelijk
+  const handleModalSave = async (formData) => {
+    if (!selectedItem) return;
+    
+    const updates = {};
+    if (selectedItem.type === 'film') {
+      updates.time = formData.time;
+    } else {
+      updates.season = formData.season;
+      updates.episode = formData.episode;
+    }
+
+    // Update lokale state
+    setWatching(prev => prev.map(item => 
+      item.id === selectedItem.id ? { ...item, ...updates } : item
+    ));
+
+    // Update database
     await supabase
       .from('media_items')
-      .update({ [field]: value })
-      .eq('id', id);
+      .update(updates)
+      .eq('id', selectedItem.id);
+
+    // Close modal en ga terug naar vorige tab
+    setSelectedItem(null);
+    setActiveTab(previousTab);
+  };
+
+  // Open modal en onthoud huidige tab
+  const openEditModal = (item) => {
+    setPreviousTab(activeTab);
+    setSelectedItem(item);
+    setActiveTab("edit");
+  };
+
+  // Sluit modal en ga terug
+  const closeEditModal = () => {
+    setSelectedItem(null);
+    setActiveTab(previousTab);
   };
 
   // Verwijderen
@@ -173,21 +227,23 @@ export default function MediaTracker() {
         </h1>
 
         {/* TABS */}
-        <div className="tab-background">
-          {[
-            { key: "watchlist", label: "Watchlist" },
-            { key: "watching", label: "Verder Kijken" },
-            { key: "watched", label: "Klaar" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={"tab"}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {activeTab !== "edit" && (
+          <div className="tab-background">
+            {[
+              { key: "watchlist", label: "Watchlist" },
+              { key: "watching", label: "Verder Kijken" },
+              { key: "watched", label: "Klaar" },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={"tab"}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* CONTENT CONTAINER */}
         <div className="container-watchlist">
@@ -318,9 +374,9 @@ export default function MediaTracker() {
           {/* --- TAB: WATCHING --- */}
             {activeTab === "watching" && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                <h2 className="nuaanhetkijken">
                   {/* <Tv className="text-purple-400"/> is waarschijnlijk een icoon component */}
-                  <span className="text-purple-400">📺</span> Nu aan het kijken
+                  <span className="watchlist-titel">Nu aan het kijken</span>
                 </h2>
                 
                 {watching.length === 0 ? (
@@ -330,8 +386,11 @@ export default function MediaTracker() {
                   <div className="results-grid"> 
                     {watching.map((item) => (
                       // Gebruik de gemeenschappelijke klasse voor de kaart
-                      <div key={item.id} className="media-card watching-card"> 
-                        
+                        <div 
+                          key={item.id} 
+                          className="media-card watching-card cursor-pointer"
+                          onClick={() => openEditModal(item)}
+                        >                        
                         {/* Afbeelding (Gebruikt dezelfde structuur) */}
                         <div className="poster-wrapper">
                           {item.poster ? (
@@ -365,59 +424,24 @@ export default function MediaTracker() {
                           
                           {/* Progressie en Acties (Specifiek voor 'Watching') */}
                           <div className="card-progress mt-3 pt-3 border-t border-slate-700/50">
+                            <p className="text-xs text-slate-400 mb-3 text-center">
+                              {item.type === "film" 
+                                ? `Tijd: ${item.time || "0:00"}` 
+                                : `S${item.season || 1}-E${item.episode || 1}`}
+                            </p>
                             
-                            {item.type === "film" && (
-                              <div className="flex-1 mb-2">
-                                <label className="text-xs text-slate-400 block mb-1 uppercase tracking-wider">Huidige Tijd</label>
-                                <input
-                                  type="time"
-                                  value={item.time || ""}
-                                  onChange={(e) => updateProgress(item.id, "time", e.target.value)}
-                                  className="bg-slate-800 text-white w-full p-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none text-center text-sm font-mono"
-                                  placeholder="0:00"
-                                />
-                              </div>
-                            )}
-
-                            {item.type === "serie" && (
-                              <div className="flex gap-2 mb-2">
-                                <div className="flex-1">
-                                  <label className="text-xs text-slate-400 block mb-1 uppercase tracking-wider">Seizoen</label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.season || 1}
-                                    onChange={(e) => updateProgress(item.id, "season", e.target.value)}
-                                    className="bg-slate-800 text-white w-full p-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none text-center text-sm font-mono font-bold"
-                                  />
-                                </div>
-                                <div className="flex-1">
-                                  <label className="text-xs text-slate-400 block mb-1 uppercase tracking-wider">Aflevering</label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={item.episode || 1}
-                                    onChange={(e) => updateProgress(item.id, "episode", e.target.value)}
-                                    className="bg-slate-800 text-white w-full p-2 rounded-lg border border-slate-600 focus:border-purple-500 focus:outline-none text-center text-sm font-mono font-bold"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-2 mt-3">
+                            <div className="voltooid-delete-buttons">
                               <button 
                                 onClick={() => updateStatus(item, 'watched')}
-                                className="flex-1 flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm font-bold shadow-lg shadow-green-900/20 transition-all"
+                                className="voltooid-button"
                               >
-                                {/* <Check size={16} /> */}
-                                ✅ Voltooid
+                                Klaar
                               </button>
                               <button 
                                 onClick={() => deleteItem(item.id, 'watching')}
-                                className="p-2 rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                                className="delete-button-2"
                               >
-                                {/* <Trash2 size={20} /> */}
-                                🗑️
+                                Verwijder
                               </button>
                             </div>
 
@@ -431,34 +455,218 @@ export default function MediaTracker() {
               </div>
             )}
 
-          {/* --- TAB: WATCHED --- */}
-          {activeTab === "watched" && (
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-6">Bekeken Historie</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {watched.map((item) => (
-                  <div key={item.id} className="bg-slate-800/60 p-3 rounded-xl flex items-center gap-3 border border-white/5 opacity-75 hover:opacity-100 transition-opacity">
-                    <div className="w-10 h-14 bg-slate-700 rounded overflow-hidden shrink-0">
-                       {item.poster && <img src={`${IMAGE_BASE_URL}${item.poster}`} className="w-full h-full object-cover" />}
+              {/* --- TAB: WATCHED --- */}
+              {activeTab === "watched" && (
+                <div>
+                  <h2 className="watchlist-titel">Geschiedenis</h2>
+
+                  {watched.length === 0 ? (
+                    <p className="text-slate-500 italic text-center py-8">Nog niks bekeken.</p>
+                  ) : (
+                    <div className="results-grid">
+                      {watched.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className="media-card watched-item"
+                        >
+                          
+                          {/* Poster */}
+                          <div className="poster-wrapper">
+                            {item.poster ? (
+                              <img 
+                                src={`${IMAGE_BASE_URL}${item.poster}`} 
+                                alt={`Poster van ${item.name}`} 
+                              />
+                            ) : (
+                              <div className="no-image-placeholder">
+                                Geen Afbeelding
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Card Content */}
+                          <div className="card-content">
+
+                            {/* Titel */}
+                            <p className="card-title">{item.name}</p>
+
+                            {/* Metadata */}
+                            <div className="metadata">
+                              <span className={`media-badge ${item.type === 'film' ? 'badge-movie' : 'badge-series'}`}>
+                                {item.type === 'film' ? 'Film' : 'Serie'}
+                              </span>
+                              <span>{item.year || ""}</span>
+                            </div>
+
+                            {/* Knoppen specifiek voor WATCHED */}
+                            <div className="watchhistorie-actions">
+                              <button 
+                                onClick={() => deleteItem(item.id, 'watched')}
+                                className="delete-button"
+                              >
+                                Verwijder
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium truncate">{item.name}</p>
-                      <p className="text-xs text-slate-400">{item.type}</p>
-                    </div>
-                    <button onClick={() => deleteItem(item.id, 'watched')} className="text-slate-500 hover:text-red-400 p-2">
-                      <Trash2 size={16} />
-                    </button>
+                  )}
+                </div>
+              )}
+
+
+        {/* --- TAB: EDIT MODAL --- */}
+        {activeTab === "edit" && selectedItem && (
+          <>
+          <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 z-50 p-4 md:p-8 overflow-auto flex items-center justify-center">
+            <div className="max-w-4xl mx-auto">
+
+              {/* Edit Card */}
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-md mx-auto">
+                {/* Header */}
+                <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
+                  <div className="w-24 h-36 bg-slate-700 rounded-lg overflow-hidden shrink-0">
+                    {selectedItem.poster && (
+                      <img 
+                        src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
+                        alt={selectedItem.name}
+                        className="poster"
+                      />
+                    )}
                   </div>
-                ))}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="title-overlay">{selectedItem.name}</h2>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-8 space-y-8">
+                  {selectedItem.type === "film" ? (
+                    // FILM: Tijd aanpassen
+                    <div className="space-y-4">
+                      <div className="huidige-tijd-controls">
+                        <button
+                          onClick={() => {
+                            const currentTime = selectedItem.time || "00:00";
+                            const [hours, minutes] = currentTime.split(":").map(Number);
+                            const totalMinutes = Math.max(0, hours * 60 + minutes - 5);
+                            const newHours = Math.floor(totalMinutes / 60);
+                            const newMins = totalMinutes % 60;
+                            const newTime = `${newHours.toString().padStart(2, "0")}:${newMins.toString().padStart(2, "0")}`;
+                            updateProgress(selectedItem.id, "time", newTime);
+                          }}
+                          className="min-knop"
+                          title="5 minuten terug"
+                        >
+                          −
+                        </button>
+                        <div
+                          className="tijd-2 control-value"
+                        >
+                          {selectedItem.time || "00:00"}
+                        </div>
+                        <button
+                          onClick={() => {
+                            const currentTime = selectedItem.time || "00:00";
+                            const [hours, minutes] = currentTime.split(":").map(Number);
+                            const totalMinutes = hours * 60 + minutes + 5;
+                            const newHours = Math.floor(totalMinutes / 60);
+                            const newMins = totalMinutes % 60;
+                            const newTime = `${newHours.toString().padStart(2, "0")}:${newMins.toString().padStart(2, "0")}`;
+                            updateProgress(selectedItem.id, "time", newTime);
+                          }}
+                          className="plus-knop"
+                          title="5 minuten vooruit"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // SERIE: Seizoen en Aflevering aanpassen
+                    <div className="space-y-8">
+                      <div className="seizoen-blok">
+                        <label className="tijd">
+                          Seizoen
+                        </label>
+                        <div className="seizoenblok">
+                          <button
+                            onClick={() => updateProgress(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))}
+                            className="min-knop"
+                          >
+                            −
+                          </button>
+                          <div
+                            className="tijd-2"
+                          >
+                            {selectedItem.season || 1}
+                          </div>
+                          <button
+                            onClick={() => updateProgress(selectedItem.id, "season", (selectedItem.season || 1) + 1)}
+                            className="plus-knop"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="aflevering-blok">
+                        <label className="tijd">
+                          Aflevering
+                        </label>
+                        <div className="afleveringblok">
+                          <button
+                            onClick={() => updateProgress(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))}
+                            className="min-knop"
+                          >
+                            −
+                          </button>
+                          <div
+                            className="tijd-2"
+                          >
+                            {selectedItem.episode || 1}
+                          </div>
+                          <button
+                            onClick={() => updateProgress(selectedItem.id, "episode", (selectedItem.episode || 1) + 1)}
+                            className="plus-knop"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="footer">
+                  <button
+                    onClick={closeEditModal}
+                    className="annuleren-knop"
+                  >
+                    Annuleren
+                  </button>
+                  <button
+                    onClick={() => handleModalSave(selectedItem)}
+                    className="opslaan-knop"
+                  >
+                    Opslaan
+                  </button>
+                </div>
               </div>
-              {watched.length === 0 && <p className="text-slate-500 text-center">Nog niks bekeken.</p>}
             </div>
-          )}
-        </div>
+          </div>
+          </>
+        )}
       </div>
+    </div>
     </div>
   );
 }
+
+
+
 
 // Klein hulpcomponentje voor de plus icon
 function PlusIcon() {

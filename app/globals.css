@@ -1,5 +1,6 @@
 body {
-  background: #000000;
+  background: url('background.jpg') no-repeat center center fixed;
+  background-size: cover;
   font-family: Arial, Helvetica, sans-serif;
   color : #FFFFFF;
 }
@@ -17,10 +18,10 @@ body {
   justify-content: center;
   gap: 0.5rem;
   margin-bottom: 2rem;
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: rgba(0, 0, 0, 0);
   padding: 0.5rem;
   border-radius: 1rem;
-  backdrop-filter: blur(10px);
+  ;
 }
 
 .tab {
@@ -33,11 +34,12 @@ body {
   background-color: rgba(15, 23, 42, 0.5);
   color: #FFFFFF;
   border: 1px solid #374151;
+  backdrop-filter: blur(0.1rem);
 }
 
 .container-watchlist {
-  background-color: rgba(15, 23, 42, 0.3);
-  backdrop-filter: blur(10px);
+  background-color: rgba(15, 23, 42, 0);
+  backdrop-filter: blur(0.1rem);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 2rem;
   padding: 1.5rem;
@@ -126,7 +128,7 @@ body {
 /* De Card-stijl voor elk zoekresultaat */
 .media-card {
     background-color: #2f2f2f; /* bg-slate-700 */
-    border-radius: 0.5rem; /* rounded-lg */
+    border-radius: 1.5rem; /* rounded-lg */
     overflow: hidden;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* shadow-lg */
     cursor: pointer;
@@ -275,4 +277,204 @@ body {
     background-color: rgba(15, 23, 42, 0.5);
     color: #FFFFFF;
     border: 1px solid #374151;
+}
+
+.tijd {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.tijdvak {
+  background-color: rgba(15, 23, 42, 0.5);
+  border: 1px solid #374151;
+    border-radius: 1.5rem;
+    align-items: center;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out forwards;
+}
+
+
+.poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2rem;
+}
+
+.title-overlay {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #FFFFFF;
+  text-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.tijd {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #FFFFFF;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.huidige-tijd-controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.tijd-2 {
+  background-color: rgba(15, 23, 42, 0.5);
+  border: 1px solid #374151;
+  border-radius: 1.5rem;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #FFFFFF;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.min-knop {
+  padding: 0.5rem 1rem;
+  border-radius: 1.5rem;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  font-size: 1.5rem;
+  transition: background-color 0.3s, color 0.3s;
+margin-bottom: 1rem;
+}
+
+.plus-knop {
+  padding: 0.5rem 1rem;
+  border-radius: 1.5rem;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  font-size: 1.5rem;
+  transition: background-color 0.3s, color 0.3s;
+margin-bottom: 1rem;
+}
+
+.annuleren-knop {
+  padding: 0.5rem 1rem;
+  border-radius: 1.5rem;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  font-size: 1rem;
+  transition: background-color 0.3s, color 0.3s;
+  margin-bottom: 1.5rem;
+}
+
+.opslaan-knop {
+  padding: 0.5rem 1rem;
+  border-radius: 1.5rem;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  font-size: 1rem;
+  transition: background-color 0.3s, color 0.3s;
+  margin-bottom: 1.5rem;
+}
+
+.footer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.seizoen-blok {
+    display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-direction: column;
+  margin-top: 2.5rem;
+}
+
+.aflevering-blok {
+    display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-direction: column;
+}
+
+.seizoenblok {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.afleveringblok {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.voltooid-delete-buttons {
+    display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.voltooid-button {
+    padding: 0.5rem 0.8rem; /* px-4 py-2 */
+    margin-top: 0.7rem; /* m-2 */
+    margin-left: 0rem;
+    margin-bottom: 0.5rem;
+    margin-right: 0rem;
+    border-radius: 0.75rem;
+    transition: all 0.3s;
+    font-weight: 500;
+    align-items: center;
+    align-self: center;
+    background-color: rgba(15, 23, 42, 0.5);
+    color: #FFFFFF;
+    border: 1px solid #374151;
+}
+
+.delete-button-2 {
+    padding: 0.5rem 0.8rem; /* px-4 py-2 */
+    margin-top: 0.7rem; /* m-2 */
+    margin-left: 0rem;
+    margin-bottom: 0.5rem;
+    margin-right: 0rem;
+    border-radius: 0.75rem;
+    transition: all 0.3s;
+    font-weight: 500;
+    align-items: center;
+    align-self: center;
+    background-color: rgba(15, 23, 42, 0.5);
+    color: #FFFFFF;
+    border: 1px solid #374151;
+}
+
+.nuaanhetkijken {
+  align-items: center;
+  text-align: center;
+}
+
+.watchhistorie-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
 }
