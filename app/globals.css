@@ -3,6 +3,11 @@ body {
   background-size: cover;
   font-family: Arial, Helvetica, sans-serif;
   color : #FFFFFF;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+
 }
 
 .titel {
@@ -477,4 +482,10 @@ margin-bottom: 1rem;
   display: flex;
   justify-content: center;
   gap: 1rem;
+}
+
+/* Tailwind custom class of global */
+.fullscreen-bg {
+  height: 100dvh; /* ipv 100vh */
+  min-height: 100dvh;
 }
