@@ -22,6 +22,15 @@ export default function MediaTracker() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [detailsOverview, setDetailsOverview] = useState(null);
+  const [detailsData, setDetailsData] = useState(null);
+
+  const formatRuntime = (minutes) => {
+    if (minutes == null) return null;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}u ${m}m` : `${m}m`;
+  };
 
 
   // --- 1. DATA OPHALEN UIT SUPABASE ---
@@ -198,6 +207,49 @@ export default function MediaTracker() {
     setActiveTab("edit");
   };
 
+  // Open details modal (read-only) voor tabs anders dan 'watching'
+  const openDetailsModal = async (item) => {
+    setPreviousTab(activeTab);
+    setSelectedItem(item);
+    setActiveTab("details");
+    setDetailsOverview(null);
+    setDetailsData(null);
+
+    // Haal uitgebreide details op van TMDB (met credits, videos, images)
+    try {
+      const mediaType = item.type === 'film' ? 'movie' : 'tv';
+      if (item.tmdb_id) {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/${mediaType}/${item.tmdb_id}?api_key=${TMDB_API_KEY}&language=nl-NL&append_to_response=credits,videos,images,external_ids`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setDetailsData(data);
+          setDetailsOverview(data.overview || null);
+        }
+      }
+    } catch (err) {
+      console.error('Fout bij ophalen TMDB details:', err);
+    }
+  };
+
+  const closeDetailsModal = () => {
+    setSelectedItem(null);
+    setActiveTab(previousTab);
+    setDetailsOverview(null);
+    setDetailsData(null);
+    
+    // Scroll naar de item na modal sluiten
+    if (selectedItem) {
+      setTimeout(() => {
+        const element = document.getElementById(`item-${selectedItem.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    }
+  };
+
   // Sluit modal en ga terug
   const closeEditModal = () => {
     setSelectedItem(null);
@@ -219,8 +271,9 @@ export default function MediaTracker() {
     return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="animate-spin mr-2"/> Je lijst laden...</div>
   }
 
+  
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-8 font-sans text-slate-100">
+    <div className="background-image">
       <div className="max-w-4xl mx-auto">
         <h1 className="titel">
           Media Tracker
@@ -317,7 +370,9 @@ export default function MediaTracker() {
                     {watchlist.map((item) => (
                       <div 
                         key={item.id} 
-                        className="media-card watchlist-item" // 'watchlist-item' kan worden gebruikt voor specifieke styling
+                        id={`item-${item.id}`}
+                        className="media-card watchlist-item"
+                        onClick={() => openDetailsModal(item)}
                       >
                         
                         {/* Afbeelding of Placeholder (Gebruikt dezelfde structuur) */}
@@ -354,12 +409,10 @@ export default function MediaTracker() {
                           
                           {/* Acties toevoegen voor de watchlist items, bijvoorbeeld onder de metadata */}
                           <div className="watchlist-actions">
-                            <button onClick={() => updateStatus(item, 'watching')} className="start-button">
+                            <button onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watching'); }} className="start-button">
                               Start
                             </button>
-                            <button onClick={() => deleteItem(item.id, 'watchlist')} className="delete-button">
-                              {/* U moet de Trash2 component importeren of vervangen door een icon */}
-                              {/* Bijv. 'X' of een SVG-icon */}
+                            <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watchlist'); }} className="delete-button">
                               Verwijder
                             </button>
                           </div>
@@ -388,6 +441,7 @@ export default function MediaTracker() {
                       // Gebruik de gemeenschappelijke klasse voor de kaart
                         <div 
                           key={item.id} 
+                          id={`item-${item.id}`}
                           className="media-card watching-card cursor-pointer"
                           onClick={() => openEditModal(item)}
                         >                        
@@ -432,13 +486,13 @@ export default function MediaTracker() {
                             
                             <div className="voltooid-delete-buttons">
                               <button 
-                                onClick={() => updateStatus(item, 'watched')}
+                                onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watched'); }}
                                 className="voltooid-button"
                               >
                                 Klaar
                               </button>
                               <button 
-                                onClick={() => deleteItem(item.id, 'watching')}
+                                onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watching'); }}
                                 className="delete-button-2"
                               >
                                 Verwijder
@@ -467,7 +521,9 @@ export default function MediaTracker() {
                       {watched.map((item) => (
                         <div 
                           key={item.id} 
+                          id={`item-${item.id}`}
                           className="media-card watched-item"
+                          onClick={() => openDetailsModal(item)}
                         >
                           
                           {/* Poster */}
@@ -501,7 +557,7 @@ export default function MediaTracker() {
                             {/* Knoppen specifiek voor WATCHED */}
                             <div className="watchhistorie-actions">
                               <button 
-                                onClick={() => deleteItem(item.id, 'watched')}
+                                onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watched'); }}
                                 className="delete-button"
                               >
                                 Verwijder
@@ -515,6 +571,116 @@ export default function MediaTracker() {
                 </div>
               )}
 
+
+        {/* --- TAB: DETAILS MODAL --- */}
+        {activeTab === "details" && selectedItem && (
+          <>
+          <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 z-50 p-4 md:p-8 overflow-auto flex items-center justify-center">
+            <div className="max-w-4xl mx-auto">
+
+              {/* Details Card */}
+              <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-2xl mx-auto">
+                <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
+                  <div className="w-24 h-36 bg-slate-700 rounded-lg overflow-hidden shrink-0">
+                    {selectedItem.poster && (
+                      <img 
+                        src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
+                        alt={selectedItem.name}
+                        className="poster"
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="title-overlay">{selectedItem.name}</h2>
+                    <p className="text-sm text-slate-400">{selectedItem.type === 'film' ? 'Film' : 'Serie'} • {selectedItem.year || ''}</p>
+                  </div>
+                </div>
+
+                <div className="p-8 space-y-6">
+                  {detailsData?.tagline && (
+                    <p className="italic text-slate-400">{detailsData.tagline}</p>
+                  )}
+
+                  <p className="text-slate-200 leading-relaxed">
+                    {detailsData?.overview || detailsOverview || selectedItem.description || 'Geen beschrijving beschikbaar.'}
+                  </p>
+
+                  <div className="text-sm text-slate-300 space-y-2">
+                    <div>
+                      {detailsData?.genres && detailsData.genres.length > 0 && (
+                        <p><strong>Genre:</strong> {detailsData.genres.map(g => g.name).join(', ')}</p>
+                      )}
+                      {detailsData?.runtime != null && (
+                        <p><strong>Duur:</strong> {formatRuntime(detailsData.runtime)}</p>
+                      )}
+                      {detailsData?.episode_run_time && detailsData.episode_run_time.length > 0 && (
+                        <p><strong>Duur per afl.:</strong> {detailsData.episode_run_time.join(', ')} min</p>
+                      )}
+                      {(detailsData?.release_date || detailsData?.first_air_date) && (
+                        <p><strong>Datum:</strong> {detailsData.release_date || detailsData.first_air_date}</p>
+                      )}
+                      {detailsData?.vote_average != null && (
+                        <p><strong>Beoordeling:</strong> ⭐ {detailsData.vote_average.toFixed(1)} ({detailsData.vote_count || 0} stemmen)</p>
+                      )}
+                      {detailsData?.production_countries && detailsData.production_countries.length > 0 && (
+                        <p><strong>Land:</strong> {detailsData.production_countries.map(c => c.name).join(', ')}</p>
+                      )}
+                      {detailsData?.spoken_languages && detailsData.spoken_languages.length > 0 && (
+                        <p><strong>Talen:</strong> {detailsData.spoken_languages.map(l => l.english_name || l.name).join(', ')}</p>
+                      )}
+                      {detailsData?.networks && detailsData.networks.length > 0 && (
+                        <p><strong>Netwerk:</strong> {detailsData.networks.map(n => n.name).join(', ')}</p>
+                      )}
+                      {detailsData?.number_of_seasons != null && (
+                        <p><strong>Seizoenen:</strong> {detailsData.number_of_seasons}</p>
+                      )}
+                      {detailsData?.number_of_episodes != null && (
+                        <p><strong>Afleveringen:</strong> {detailsData.number_of_episodes}</p>
+                      )}
+                      {detailsData?.homepage && (
+                        <p><strong>Website:</strong> <a href={detailsData.homepage} target="_blank" rel="noreferrer" className="website-link">{detailsData.homepage}</a></p>
+                      )}
+                    </div>
+
+                    {detailsData?.credits?.cast && detailsData.credits.cast.length > 0 && (
+                      <div>
+                        <p className="font-medium"><strong>Cast:</strong></p>
+                        <div className="overflow-x-auto">
+                          <div className="carrousel">
+                            {detailsData.credits.cast.slice(0, 12).map((c, i) => (
+                              <div key={i} className="text-center min-w-[120px]">
+                                {c.profile_path ? (
+                                  <img 
+                                    src={`${IMAGE_BASE_URL}${c.profile_path}`} 
+                                    alt={c.name}
+                                    className="rounded-lg w-full h-auto object-cover mb-2 hover:opacity-80 transition-opacity"
+                                  />
+                                ) : (
+                                  <div className="w-full aspect-square bg-slate-700 rounded-lg mb-2 flex items-center justify-center text-slate-500 text-xs">
+                                    Geen foto
+                                  </div>
+                                )}
+                                <p className="text-xs font-medium text-slate-200 truncate">{c.name}</p>
+                                {c.character && (
+                                  <p className="text-xs text-slate-400 truncate">{c.character}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button onClick={closeDetailsModal} className="annuleren-knop">Sluit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </>
+        )}
 
         {/* --- TAB: EDIT MODAL --- */}
         {activeTab === "edit" && selectedItem && (
