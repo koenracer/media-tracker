@@ -22,8 +22,6 @@ export default function MediaTracker() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedActor, setSelectedActor] = useState(null);
-  const [actorDetails, setActorDetails] = useState(null);
   const [detailsOverview, setDetailsOverview] = useState(null);
   const [detailsData, setDetailsData] = useState(null);
 
@@ -252,31 +250,11 @@ export default function MediaTracker() {
     }
   };
 
-  // Open actor modal from cast list
-  const openActorModal = async (castMember, e) => {
+  // Open Google Search in new tab for actor
+  const openActorModal = (castMember, e) => {
     if (e) e.stopPropagation();
-    setPreviousTab(activeTab);
-    setSelectedActor(castMember);
-    setActorDetails(null);
-    setActiveTab('actor');
-
-    try {
-      const res = await fetch(
-        `https://api.themoviedb.org/3/person/${castMember.id}?api_key=${TMDB_API_KEY}&language=nl-NL&append_to_response=movie_credits,tv_credits,images,external_ids`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setActorDetails(data);
-      }
-    } catch (err) {
-      console.error('Fout bij ophalen actor details:', err);
-    }
-  };
-
-  const closeActorModal = () => {
-    setSelectedActor(null);
-    setActorDetails(null);
-    setActiveTab(previousTab);
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(castMember.name)}`;
+    window.open(searchUrl, '_blank');
   };
 
   // Sluit modal en ga terug
@@ -327,75 +305,7 @@ export default function MediaTracker() {
           </div>
         )}
 
-        {/* --- TAB: ACTOR MODAL --- */}
-        {activeTab === "actor" && selectedActor && (
-          <>
-            <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 z-60 p-4 md:p-8 overflow-auto flex items-center justify-center">
-              <div className="max-w-3xl mx-auto">
-                <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-2xl mx-auto">
-                  <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
-                    <div className="w-24 h-24 bg-slate-700 rounded-lg overflow-hidden shrink-0">
-                      {selectedActor.profile_path && actorDetails?.profile_path ? (
-                        <img src={`${IMAGE_BASE_URL}${actorDetails.profile_path}`} alt={actorDetails.name || selectedActor.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-slate-700 flex items-center justify-center text-slate-500">Geen foto</div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="text-2xl font-bold text-white">{actorDetails?.name || selectedActor.name}</h2>
-                      {actorDetails?.birthday && <p className="text-sm text-slate-400">Geboren: {actorDetails.birthday} {actorDetails.place_of_birth ? `• ${actorDetails.place_of_birth}` : ''}</p>}
-                    </div>
-                    <button onClick={closeActorModal} className="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white">✕</button>
-                  </div>
 
-                  <div className="p-6 space-y-4">
-                    <p className="text-slate-200 leading-relaxed">{actorDetails?.biography || 'Geen biografie beschikbaar.'}</p>
-
-                    {actorDetails && (
-                      <div className="text-sm text-slate-300">
-                        {actorDetails.known_for_department && <p><strong>Bekend van:</strong> {actorDetails.known_for_department}</p>}
-                        {actorDetails.imdb_id && <p><strong>IMDB:</strong> <a href={`https://www.imdb.com/name/${actorDetails.imdb_id}`} target="_blank" rel="noreferrer" className="website-link">Bekijk op IMDB</a></p>}
-
-                        {/* Credits: show top movies/tv roles */}
-                        {actorDetails.movie_credits?.cast && actorDetails.movie_credits.cast.length > 0 && (
-                          <div>
-                            <p className="font-medium mt-3">Belangrijkste films</p>
-                            <div className="results-grid">
-                              {actorDetails.movie_credits.cast.slice(0,6).map((m) => (
-                                <div key={m.credit_id || m.id} className="media-card" onClick={() => { setDetailsData(m); /* optional: could open details */ }}>
-                                  {m.poster_path ? <div className="poster-wrapper"><img src={`${IMAGE_BASE_URL}${m.poster_path}`} className="poster" /></div> : <div className="no-image-placeholder">Geen afbeelding</div>}
-                                  <div className="card-content"><p className="card-title">{m.title || m.name}</p></div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {actorDetails.tv_credits?.cast && actorDetails.tv_credits.cast.length > 0 && (
-                          <div>
-                            <p className="font-medium mt-3">Belangrijkste series</p>
-                            <div className="results-grid">
-                              {actorDetails.tv_credits.cast.slice(0,6).map((m) => (
-                                <div key={m.credit_id || m.id} className="media-card">
-                                  {m.poster_path ? <div className="poster-wrapper"><img src={`${IMAGE_BASE_URL}${m.poster_path}`} className="poster" /></div> : <div className="no-image-placeholder">Geen afbeelding</div>}
-                                  <div className="card-content"><p className="card-title">{m.name || m.title}</p></div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="flex gap-3">
-                      <button onClick={closeActorModal} className="annuleren-knop">Sluit</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
 
         {/* CONTENT CONTAINER */}
         <div className="container-watchlist">
@@ -926,6 +836,7 @@ export default function MediaTracker() {
         )}
       </div>
     </div>
+    <p className="footer-text">Koen Donkers  •  2025</p>
     </div>
   );
 }
