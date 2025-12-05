@@ -75,14 +75,14 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-slate-800 rounded-lg shadow-2xl p-8 border border-slate-700">
+      <div className="inlogpagina">
+        <div className="tehbljh">
           {/* Logo/Title */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-cyan-400 mb-2">
-              🎬 MediaTracker
+            <h1 className="titel">
+              MediaTracker
             </h1>
-            <p className="text-slate-400">
+            <p className="tekst">
               {isLogin ? "Welkom terug!" : "Begin je avontuur"}
             </p>
           </div>
@@ -101,30 +101,24 @@ export default function AuthPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                E-mail
-              </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 transition"
+                className="tekstveld"
                 placeholder="jouw@email.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Wachtwoord
-              </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 transition"
-                placeholder="••••••••"
+                className="tekstveld"
+                placeholder="Je wachtwoord"
               />
             </div>
 

@@ -516,3 +516,48 @@ margin-bottom: 1rem;
   color: #ffffff;
   text-align: center;
 }
+
+.email {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #374151;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  outline: none;
+  transition: all 0.3s;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  margin-top: 1rem;
+}
+
+.tekst {
+  font-size: 1rem;
+  color: #FFFFFF;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.inlogpagina {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 2rem;
+  padding: 2rem;
+  align-items: center;
+  text-align: center;
+  align-self: center;
+}
+
+.tekstveld {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #374151;
+  background-color: rgba(15, 23, 42, 0.5);
+  color: #FFFFFF;
+  outline: none;
+  transition: all 0.3s;
+  align-items: center;
+  text-align: center;
+  margin: 2rem 0rem 1rem 0rem;
+}
