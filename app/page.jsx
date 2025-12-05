@@ -1,10 +1,25 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2 } from "lucide-react";
-// Importeer de supabase client die je net hebt gemaakt in stap 3
-import { supabase } from "./supabaseClient"; 
+import { db } from "./firebaseConfig";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  orderBy,
+} from "firebase/firestore";
+import { useAuth } from "./AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function MediaTracker() {
+  const router = useRouter();
+  const { user, loading: authLoading, logout } = useAuth();
+  
   const TMDB_API_KEY = "c60432138621b30259eb888814e361ca"; 
   const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
@@ -33,29 +48,62 @@ export default function MediaTracker() {
   };
 
 
-  // --- 1. DATA OPHALEN UIT SUPABASE ---
+  // --- 1. DATA OPHALEN UIT FIRESTORE ---
   const fetchData = async () => {
+    if (!user) {
+      console.log("No user, skipping fetchData");
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
-    // Haal alles op uit de tabel 'media_items'
-    const { data, error } = await supabase
-      .from('media_items')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // Query voor gebruikers items
+      const q = query(
+        collection(db, "media_items"),
+        where("user_id", "==", user.uid),
+        orderBy("created_at", "desc")
+      );
 
-    if (error) {
-      console.error("Fout bij ophalen:", error);
-    } else {
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      console.log("Data fetched successfully:", data?.length || 0, "items");
+      
       // Verdeel de data over de 3 lijsten op basis van de 'status' kolom
       setWatchlist(data.filter(item => item.status === 'watchlist'));
       setWatching(data.filter(item => item.status === 'watching'));
       setWatched(data.filter(item => item.status === 'watched'));
+    } catch (err) {
+      console.error("Exception in fetchData:", err);
+      // Bij permission denied, toon warning
+      if (err.message.includes("permission denied")) {
+        console.warn("Permission denied - zorg dat Firestore rules correct zijn ingesteld");
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    // Controleer of gebruiker ingelogd is
+    console.log("Auth state:", { user, authLoading });
+    
+    if (authLoading) {
+      return; // Wacht nog op auth check
+    }
+    
+    if (!user) {
+      console.log("No user, redirecting to /auth");
+      router.push("/auth");
+    } else {
+      console.log("User found, fetching data");
+      fetchData();
+    }
+  }, [user, authLoading, router]);
 
   // --- 2. ZOEKEN VIA TMDB ---
   const searchMedia = async (e) => {
@@ -80,6 +128,8 @@ export default function MediaTracker() {
 
   // --- 3. TOEVOEGEN AAN DATABASE ---
   const addSearchResultToWatchlist = async (result) => {
+    if (!user) return;
+    
     // Check lokaal of hij al bestaat om API calls te besparen
     const allItems = [...watchlist, ...watching, ...watched];
     if (allItems.some(i => i.tmdb_id === result.id)) {
@@ -88,27 +138,27 @@ export default function MediaTracker() {
     }
 
     const newItem = {
+      user_id: user.uid,
       tmdb_id: result.id,
       name: result.title || result.name,
       type: result.media_type === 'movie' ? 'film' : 'serie',
-      poster: result.poster_path, // We slaan alleen het pad op!
+      poster: result.poster_path,
       year: (result.release_date || result.first_air_date || "").substring(0, 4),
-      status: 'watchlist', // Standaard status
+      status: 'watchlist',
+      created_at: new Date(),
     };
 
-    // Stuur naar Supabase
-    const { data, error } = await supabase
-      .from('media_items')
-      .insert([newItem])
-      .select();
-
-    if (error) {
-      console.error("Error inserting:", error);
-    } else {
+    try {
+      // Voeg toe aan Firestore
+      const docRef = await addDoc(collection(db, "media_items"), newItem);
+      
       // Voeg toe aan lokale state (zodat we niet hoeven te herladen)
-      setWatchlist([data[0], ...watchlist]);
+      setWatchlist([{ id: docRef.id, ...newItem }, ...watchlist]);
       setSearchResults([]);
       setSearchQuery("");
+    } catch (error) {
+      console.error("Error adding item:", error);
+      alert("Fout bij toevoegen: " + error.message);
     }
   };
 
@@ -131,22 +181,23 @@ export default function MediaTracker() {
       updates.episode = item.type === 'serie' ? 1 : null;
     }
 
-    // Update in Database
-    const { data, error } = await supabase
-      .from('media_items')
-      .update(updates)
-      .eq('id', item.id)
-      .select();
+    try {
+      // Update in Firestore
+      const itemRef = doc(db, "media_items", item.id);
+      await updateDoc(itemRef, updates);
 
-    if (!error && data) {
       // Voeg toe aan nieuwe lijst in state
-      const updatedItem = data[0];
+      const updatedItem = { ...item, ...updates };
       if (newStatus === 'watching') {
         setWatching(prev => [updatedItem, ...prev]);
         setActiveTab("watching");
       } else if (newStatus === 'watched') {
         setWatched(prev => [updatedItem, ...prev]);
       }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      // Reload data bij error
+      fetchData();
     }
   };
 
@@ -161,12 +212,10 @@ export default function MediaTracker() {
     // Update geselecteerd item in de edit view als het overeenkomt
     setSelectedItem(prev => prev && prev.id === id ? { ...prev, [field]: normalizedValue } : prev);
 
-    // Update database (met debounce zou beter zijn, maar dit werkt voor nu)
+    // Update database
     try {
-      await supabase
-        .from('media_items')
-        .update({ [field]: normalizedValue })
-        .eq('id', id);
+      const itemRef = doc(db, "media_items", id);
+      await updateDoc(itemRef, { [field]: normalizedValue });
     } catch (err) {
       console.error('Fout bij updaten voortgang:', err);
     }
@@ -189,11 +238,14 @@ export default function MediaTracker() {
       item.id === selectedItem.id ? { ...item, ...updates } : item
     ));
 
-    // Update database
-    await supabase
-      .from('media_items')
-      .update(updates)
-      .eq('id', selectedItem.id);
+    try {
+      // Update Firestore
+      const itemRef = doc(db, "media_items", selectedItem.id);
+      await updateDoc(itemRef, updates);
+    } catch (error) {
+      console.error("Error saving:", error);
+      fetchData();
+    }
 
     // Close modal en ga terug naar vorige tab
     setSelectedItem(null);
@@ -270,9 +322,22 @@ export default function MediaTracker() {
     if (currentListStatus === 'watching') setWatching(l => l.filter(i => i.id !== id));
     if (currentListStatus === 'watched') setWatched(l => l.filter(i => i.id !== id));
 
-    // Verwijder uit DB
-    await supabase.from('media_items').delete().eq('id', id);
+    try {
+      // Verwijder uit Firestore
+      const itemRef = doc(db, "media_items", id);
+      await deleteDoc(itemRef);
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
   };
+
+  if (authLoading) {
+    return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="animate-spin mr-2"/> Laden...</div>
+  }
+
+  if (!user) {
+    return null; // Router leidt door naar /auth
+  }
 
   if (loading) {
     return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="animate-spin mr-2"/> Je lijst laden...</div>

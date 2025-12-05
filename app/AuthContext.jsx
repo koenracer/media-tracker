@@ -1,6 +1,10 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../supabaseClient";
+import { auth } from "./firebaseConfig";
+import { 
+  onAuthStateChanged, 
+  signOut
+} from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 const AuthContext = createContext();
@@ -11,31 +15,25 @@ export function AuthProvider({ children }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check of er een sessie actief is
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+    // Setup Firebase auth listener
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("Auth state changed:", currentUser?.email || "no user");
+      setUser(currentUser);
       setLoading(false);
-    };
-
-    checkSession();
-
-    // Luister naar auth veranderingen
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChanged((event, session) => {
-      setUser(session?.user || null);
     });
 
-    return () => subscription.unsubscribe();
+    // Cleanup
+    return () => unsubscribe();
   }, []);
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    router.push("/auth");
+    try {
+      await signOut(auth);
+      setUser(null);
+      router.push("/auth");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (
