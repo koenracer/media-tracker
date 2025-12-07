@@ -58,18 +58,24 @@ export default function MediaTracker() {
     
     setLoading(true);
     try {
-      // Query voor gebruikers items
+      console.log("Fetching data for user:", user.uid);
+      
+      // Query voor gebruikers items (zonder orderBy eerst)
       const q = query(
         collection(db, "media_items"),
-        where("user_id", "==", user.uid),
-        orderBy("created_at", "desc")
+        where("user_id", "==", user.uid)
       );
 
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      console.log("Query succeeded, documents found:", querySnapshot.size);
+      
+      const data = querySnapshot.docs.map(doc => {
+        console.log("Document:", doc.id, doc.data());
+        return {
+          id: doc.id,
+          ...doc.data()
+        };
+      });
 
       console.log("Data fetched successfully:", data?.length || 0, "items");
       
@@ -78,7 +84,9 @@ export default function MediaTracker() {
       setWatching(data.filter(item => item.status === 'watching'));
       setWatched(data.filter(item => item.status === 'watched'));
     } catch (err) {
-      console.error("Exception in fetchData:", err);
+      console.error("Exception in fetchData - Full error:", err);
+      console.error("Error code:", err.code);
+      console.error("Error message:", err.message);
       // Bij permission denied, toon warning
       if (err.message.includes("permission denied")) {
         console.warn("Permission denied - zorg dat Firestore rules correct zijn ingesteld");
