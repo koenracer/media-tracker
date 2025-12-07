@@ -346,27 +346,41 @@ export default function MediaTracker() {
     setActiveTab(previousTab);
   };
 
-  // Open modal en onthoud huidige tab
-  const openEditModal = (item) => {
-    setPreviousTab(activeTab);
-    setSelectedItem(item);
-    setActiveTab("edit");
-  };
-
   // Open details modal (read-only) voor tabs anders dan 'watching'
-  const openDetailsModal = async (item) => {
+  const openDetailsModal = async (item, fromSearch = false) =>{
+    setOpenedFromSearch(fromSearch);
     setPreviousTab(activeTab);
-    setSelectedItem(item);
+    
+    // Normaliseer het item formaat voor zoekresultaten
+    const normalizedItem = fromSearch ? {
+      ...item,
+      name: item.title || item.name,
+      poster: item.poster_path,
+      year: (item.release_date || item.first_air_date || "").substring(0, 4),
+      type: item.media_type === 'movie' ? 'film' : 'serie'
+    } : item;
+    
+    setSelectedItem(normalizedItem);
     setActiveTab("details");
     setDetailsOverview(null);
     setDetailsData(null);
 
     // Haal uitgebreide details op van TMDB (met credits, videos, images)
     try {
-      const mediaType = item.type === 'film' ? 'movie' : 'tv';
-      if (item.tmdb_id) {
+      // Voor zoekresultaten: gebruik media_type, anders gebruik type
+      let mediaType;
+      if (fromSearch) {
+        mediaType = item.media_type === 'movie' ? 'movie' : 'tv';
+      } else {
+        mediaType = item.type === 'film' ? 'movie' : 'tv';
+      }
+      
+      // Voor zoekresultaten: gebruik item.id, anders gebruik item.tmdb_id
+      const tmdbId = fromSearch ? item.id : item.tmdb_id;
+      
+      if (tmdbId) {
         const res = await fetch(
-          `https://api.themoviedb.org/3/${mediaType}/${item.tmdb_id}?api_key=${TMDB_API_KEY}&language=nl-NL&append_to_response=credits,videos,images,external_ids`
+          `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${TMDB_API_KEY}&language=nl-NL&append_to_response=credits,videos,images,external_ids`
         );
         if (res.ok) {
           const data = await res.json();
@@ -395,6 +409,9 @@ export default function MediaTracker() {
       }, 100);
     }
   };
+  
+  const [openedFromSearch, setOpenedFromSearch] = useState(false);
+
 
   // Open Google Search in new tab for actor
   const openActorModal = (castMember, e) => {
@@ -499,7 +516,7 @@ export default function MediaTracker() {
                     {searchResults.map((result) => (
                       <div 
                         key={result.id} 
-                        onClick={() => addSearchResultToWatchlist(result)}
+                        onClick={() => openDetailsModal(result, true)}
                         className="media-card"
                       >
                         
@@ -847,9 +864,17 @@ export default function MediaTracker() {
                       </div>
                     )}
                   </div>
-
+                  
                   <div className="flex gap-3">
                     <button onClick={closeDetailsModal} className="annuleren-knop">Sluit</button>
+                    {openedFromSearch && (
+                    <button 
+                      className="toevoegen-watchlist"
+                      onClick={() => addSearchResultToWatchlist(selectedItem)}
+                    >
+                      + Voeg toe aan watchlist
+                    </button>
+                  )}
                   </div>
                 </div>
               </div>
