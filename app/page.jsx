@@ -1008,12 +1008,12 @@ export default function MediaTracker() {
     <div className="max-w-4xl mx-auto px-4">
       {isAnonymousUser(user) && (
         <div className="mb-8 p-4 bg-gradient-to-r from-purple-900 to-slate-800 border border-purple-500/50 rounded-lg">
-          <p className="text-slate-200 text-sm mb-3">
-            Je gebruikt momenteel een anoniem account. 📌 Je films worden opgeslagen op je computer, niet in de cloud.
+          <p className="center-footer-text">
+            Je gebruikt momenteel een anoniem account. Je films worden opgeslagen op je computer, niet in de cloud.
           </p>
           <button
             onClick={() => router.push("/auth")}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded transition"
+            className="anoniem-naar-account-button"
           >
             <LogIn className="w-4 h-4" />
             Maak account aan & behoud je films
