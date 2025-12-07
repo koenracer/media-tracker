@@ -204,19 +204,6 @@ export default function AuthPage() {
           </form>
 
             <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="google-inlog-knop"
-            >
-              <img 
-                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                alt="Google" 
-                className="google-logo"
-              />
-              Inloggen met Google
-            </button>
-
-            <button
               onClick={handleAnonymousSignIn}
               disabled={loading}
               className="anonymous-inlog-knop"
