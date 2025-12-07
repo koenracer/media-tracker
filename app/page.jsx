@@ -757,7 +757,7 @@ export default function MediaTracker() {
               {/* Details Card */}
               <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-2xl mx-auto">
                 <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
-                  <div className="w-24 h-36 bg-slate-700 rounded-lg overflow-hidden shrink-0">
+                  <div className="poster-container">
                     {selectedItem.poster && (
                       <img 
                         src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
