@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2 } from "lucide-react";
+import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2, LogIn } from "lucide-react";
 import { db } from "./firebaseConfig";
 import {
   collection,
@@ -11,10 +11,17 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  orderBy,
 } from "firebase/firestore";
 import { useAuth } from "./AuthContext";
 import { useRouter } from "next/navigation";
+import { 
+  isAnonymousUser, 
+  saveToLocalStorage, 
+  loadFromLocalStorage, 
+  clearLocalStorage,
+  migrateToFirestore 
+} from "./storageUtils";
+import { useMigrateAnonymousData } from "./useMigrateData";
 
 export default function MediaTracker() {
   const router = useRouter();
@@ -26,6 +33,7 @@ export default function MediaTracker() {
   const [activeTab, setActiveTab] = useState("watchlist");
   const [previousTab, setPreviousTab] = useState("watchlist");
   const [loading, setLoading] = useState(true);
+  const [wasPreviouslyAnonymous, setWasPreviouslyAnonymous] = useState(false);
   
   // Data lijsten
   const [watchlist, setWatchlist] = useState([]);
@@ -48,7 +56,38 @@ export default function MediaTracker() {
   };
 
 
-  // --- 1. DATA OPHALEN UIT FIRESTORE ---
+  // --- 1. DATA OPHALEN ---
+  const migrateDataToFirestore = async (localData) => {
+    setLoading(true);
+    try {
+      const allItems = [...localData.watchlist, ...localData.watching, ...localData.watched];
+      console.log("Migreren van", allItems.length, "items naar Firestore");
+
+      for (const item of allItems) {
+        try {
+          await addDoc(collection(db, "media_items"), {
+            ...item,
+            user_id: user.uid,
+            created_at: item.created_at || new Date(),
+          });
+        } catch (error) {
+          console.error("Error migreren item:", error);
+        }
+      }
+
+      clearLocalStorage();
+      console.log("Migratie voltooid!");
+      setWasPreviouslyAnonymous(false);
+      
+      // Nu laad de nieuwe data
+      fetchData();
+    } catch (error) {
+      console.error("Migratie fout:", error);
+      setLoading(false);
+    }
+  };
+
+  // --- 1. DATA OPHALEN ---
   const fetchData = async () => {
     if (!user) {
       console.log("No user, skipping fetchData");
@@ -58,39 +97,40 @@ export default function MediaTracker() {
     
     setLoading(true);
     try {
-      console.log("Fetching data for user:", user.uid);
-      
-      // Query voor gebruikers items (zonder orderBy eerst)
-      const q = query(
-        collection(db, "media_items"),
-        where("user_id", "==", user.uid)
-      );
+      // Check of het een anonieme gebruiker is
+      if (isAnonymousUser(user)) {
+        console.log("Anonieme gebruiker - laad van localStorage");
+        const localData = loadFromLocalStorage();
+        setWatchlist(localData.watchlist);
+        setWatching(localData.watching);
+        setWatched(localData.watched);
+      } else {
+        // Authenticated user - laad van Firestore
+        console.log("Authenticated user - laad van Firestore:", user.uid);
+        
+        const q = query(
+          collection(db, "media_items"),
+          where("user_id", "==", user.uid)
+        );
 
-      const querySnapshot = await getDocs(q);
-      console.log("Query succeeded, documents found:", querySnapshot.size);
-      
-      const data = querySnapshot.docs.map(doc => {
-        console.log("Document:", doc.id, doc.data());
-        return {
+        const querySnapshot = await getDocs(q);
+        console.log("Query succeeded, documents found:", querySnapshot.size);
+        
+        const data = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        };
-      });
+        }));
 
-      console.log("Data fetched successfully:", data?.length || 0, "items");
-      
-      // Verdeel de data over de 3 lijsten op basis van de 'status' kolom
-      setWatchlist(data.filter(item => item.status === 'watchlist'));
-      setWatching(data.filter(item => item.status === 'watching'));
-      setWatched(data.filter(item => item.status === 'watched'));
+        console.log("Data fetched successfully:", data?.length || 0, "items");
+        
+        setWatchlist(data.filter(item => item.status === 'watchlist'));
+        setWatching(data.filter(item => item.status === 'watching'));
+        setWatched(data.filter(item => item.status === 'watched'));
+      }
     } catch (err) {
       console.error("Exception in fetchData - Full error:", err);
       console.error("Error code:", err.code);
       console.error("Error message:", err.message);
-      // Bij permission denied, toon warning
-      if (err.message.includes("permission denied")) {
-        console.warn("Permission denied - zorg dat Firestore rules correct zijn ingesteld");
-      }
     } finally {
       setLoading(false);
     }
@@ -108,8 +148,23 @@ export default function MediaTracker() {
       console.log("No user, redirecting to /auth");
       router.push("/auth");
     } else {
-      console.log("User found, fetching data");
-      fetchData();
+      // Check of we moeten migreren van anoniem naar ingelogd
+      if (wasPreviouslyAnonymous && !isAnonymousUser(user)) {
+        console.log("Migreren van anoniem naar ingelogd");
+        const localData = loadFromLocalStorage();
+        if (localData.watchlist.length > 0 || localData.watching.length > 0 || localData.watched.length > 0) {
+          // Migreer data
+          migrateDataToFirestore(localData);
+        } else {
+          fetchData();
+        }
+      } else {
+        // Normale load
+        if (isAnonymousUser(user)) {
+          setWasPreviouslyAnonymous(true);
+        }
+        fetchData();
+      }
     }
   }, [user, authLoading, router]);
 
@@ -146,6 +201,7 @@ export default function MediaTracker() {
     }
 
     const newItem = {
+      id: Date.now().toString(), // Temp ID voor localStorage
       user_id: user.uid,
       tmdb_id: result.id,
       name: result.title || result.name,
@@ -157,11 +213,19 @@ export default function MediaTracker() {
     };
 
     try {
-      // Voeg toe aan Firestore
-      const docRef = await addDoc(collection(db, "media_items"), newItem);
+      if (isAnonymousUser(user)) {
+        // Voeg toe aan localStorage
+        console.log("Adding to localStorage");
+        const updatedWatchlist = [newItem, ...watchlist];
+        setWatchlist(updatedWatchlist);
+        saveToLocalStorage(updatedWatchlist, watching, watched);
+      } else {
+        // Voeg toe aan Firestore
+        console.log("Adding to Firestore");
+        const docRef = await addDoc(collection(db, "media_items"), newItem);
+        setWatchlist([{ id: docRef.id, ...newItem }, ...watchlist]);
+      }
       
-      // Voeg toe aan lokale state (zodat we niet hoeven te herladen)
-      setWatchlist([{ id: docRef.id, ...newItem }, ...watchlist]);
       setSearchResults([]);
       setSearchQuery("");
     } catch (error) {
@@ -174,15 +238,12 @@ export default function MediaTracker() {
   
   // Update status (bijv. van watchlist -> watching)
   const updateStatus = async (item, newStatus) => {
-    // Optimistic UI update (update scherm direct, database volgt)
-    // Verwijder uit huidige lijst
+    // Optimistic UI update
     if (item.status === 'watchlist') setWatchlist(l => l.filter(i => i.id !== item.id));
     if (item.status === 'watching') setWatching(l => l.filter(i => i.id !== item.id));
     
-    // Bereid update data voor
     const updates = { status: newStatus };
     
-    // Als we gaan kijken, zet defaults
     if (newStatus === 'watching') {
       updates.time = item.type === 'film' ? "0:00" : null;
       updates.season = item.type === 'serie' ? 1 : null;
@@ -190,40 +251,58 @@ export default function MediaTracker() {
     }
 
     try {
-      // Update in Firestore
-      const itemRef = doc(db, "media_items", item.id);
-      await updateDoc(itemRef, updates);
-
-      // Voeg toe aan nieuwe lijst in state
       const updatedItem = { ...item, ...updates };
-      if (newStatus === 'watching') {
-        setWatching(prev => [updatedItem, ...prev]);
-        setActiveTab("watching");
-      } else if (newStatus === 'watched') {
-        setWatched(prev => [updatedItem, ...prev]);
+      
+      if (isAnonymousUser(user)) {
+        // Update in localStorage
+        if (newStatus === 'watching') {
+          const updatedWatching = [updatedItem, ...watching];
+          setWatching(updatedWatching);
+          saveToLocalStorage(watchlist, updatedWatching, watched);
+        } else if (newStatus === 'watched') {
+          const updatedWatched = [updatedItem, ...watched];
+          setWatched(updatedWatched);
+          saveToLocalStorage(watchlist, watching, updatedWatched);
+        }
+      } else {
+        // Update in Firestore
+        const itemRef = doc(db, "media_items", item.id);
+        await updateDoc(itemRef, updates);
+        
+        if (newStatus === 'watching') {
+          setWatching(prev => [updatedItem, ...prev]);
+        } else if (newStatus === 'watched') {
+          setWatched(prev => [updatedItem, ...prev]);
+        }
       }
+      
+      setActiveTab("watching");
     } catch (error) {
       console.error("Error updating status:", error);
-      // Reload data bij error
       fetchData();
     }
   };
 
   // Update voortgang (tijd/seizoen/aflevering)
   const updateProgress = async (id, field, value) => {
-    // Zorg dat seizoen/episode als nummer behandeld worden
     const normalizedValue = (field === 'season' || field === 'episode') ? Number(value) : value;
 
-    // Update lokale state direct (voor soepel typen)
+    // Update lokale state direct
     setWatching(prev => prev.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item));
-
-    // Update geselecteerd item in de edit view als het overeenkomt
     setSelectedItem(prev => prev && prev.id === id ? { ...prev, [field]: normalizedValue } : prev);
 
-    // Update database
     try {
-      const itemRef = doc(db, "media_items", id);
-      await updateDoc(itemRef, { [field]: normalizedValue });
+      if (isAnonymousUser(user)) {
+        // Update in localStorage
+        const updatedWatching = watching.map(item => 
+          item.id === id ? { ...item, [field]: normalizedValue } : item
+        );
+        saveToLocalStorage(watchlist, updatedWatching, watched);
+      } else {
+        // Update in Firestore
+        const itemRef = doc(db, "media_items", id);
+        await updateDoc(itemRef, { [field]: normalizedValue });
+      }
     } catch (err) {
       console.error('Fout bij updaten voortgang:', err);
     }
@@ -247,15 +326,22 @@ export default function MediaTracker() {
     ));
 
     try {
-      // Update Firestore
-      const itemRef = doc(db, "media_items", selectedItem.id);
-      await updateDoc(itemRef, updates);
+      if (isAnonymousUser(user)) {
+        // Update in localStorage
+        const updatedWatching = watching.map(item => 
+          item.id === selectedItem.id ? { ...item, ...updates } : item
+        );
+        saveToLocalStorage(watchlist, updatedWatching, watched);
+      } else {
+        // Update in Firestore
+        const itemRef = doc(db, "media_items", selectedItem.id);
+        await updateDoc(itemRef, updates);
+      }
     } catch (error) {
       console.error("Error saving:", error);
       fetchData();
     }
 
-    // Close modal en ga terug naar vorige tab
     setSelectedItem(null);
     setActiveTab(previousTab);
   };
@@ -331,9 +417,17 @@ export default function MediaTracker() {
     if (currentListStatus === 'watched') setWatched(l => l.filter(i => i.id !== id));
 
     try {
-      // Verwijder uit Firestore
-      const itemRef = doc(db, "media_items", id);
-      await deleteDoc(itemRef);
+      if (isAnonymousUser(user)) {
+        // Update localStorage
+        const updatedWatchlist = watchlist.filter(i => i.id !== id);
+        const updatedWatching = watching.filter(i => i.id !== id);
+        const updatedWatched = watched.filter(i => i.id !== id);
+        saveToLocalStorage(updatedWatchlist, updatedWatching, updatedWatched);
+      } else {
+        // Verwijder uit Firestore
+        const itemRef = doc(db, "media_items", id);
+        await deleteDoc(itemRef);
+      }
     } catch (error) {
       console.error("Error deleting item:", error);
     }
@@ -909,6 +1003,25 @@ export default function MediaTracker() {
         )}
       </div>
     </div>
+    
+    {/* Footer met upgrade knop voor anonieme gebruikers */}
+    <div className="max-w-4xl mx-auto px-4">
+      {isAnonymousUser(user) && (
+        <div className="mb-8 p-4 bg-gradient-to-r from-purple-900 to-slate-800 border border-purple-500/50 rounded-lg">
+          <p className="text-slate-200 text-sm mb-3">
+            Je gebruikt momenteel een anoniem account. 📌 Je films worden opgeslagen op je computer, niet in de cloud.
+          </p>
+          <button
+            onClick={() => router.push("/auth")}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded transition"
+          >
+            <LogIn className="w-4 h-4" />
+            Maak account aan & behoud je films
+          </button>
+        </div>
+      )}
+    </div>
+    
     <p className="footer-text">Koen Donkers  •  2025</p>
     </div>
   );
