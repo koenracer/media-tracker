@@ -60,20 +60,6 @@ body {
   margin-bottom: 2rem;
 }
 
-.zoekbalk {
-  width: 100%;
-  background-color: rgba(15, 23, 42, 0.5);
-  border: 1px solid #374151;
-  border-radius: 1.5rem;
-  padding: 1rem 1.5rem 1rem 3rem;
-  color: #FFFFFF;
-  outline: none;
-  transition: all 0.3s;
-    box-sizing: border-box; /* padding en border zitten nu binnen width */
-  width: 100%;
-  font-size: 16px;
-}
-
 .achtergrond-zoekresultaten {
   margin-bottom: 2rem;
   background-color: rgba(0, 0, 0, 0.2);
@@ -729,4 +715,54 @@ margin-bottom: 1rem;
 .center-footer-text {
   color: #ffffff;
   text-align: center;
+}
+
+.tekst-leeg {
+  font-size: 1rem;
+  color: #FFFFFF;
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.sort-container {
+  margin-bottom: 16px;
+  text-align: right;
+}
+
+.sort-select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #1c1c1c;
+  color: white;
+  border: 1px solid #444;
+}
+
+
+.form {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.sort-select {
+    width: 70%;
+    background-color: rgb(0, 0, 0);
+    color: #ffffff;
+    font-weight: 500;
+    padding: 0.625rem 1rem;
+    border-radius: 0.1rem;
+    border: 1px solid #D1D5DB;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.zoekbalk {
+    width: 70%;
+    background-color: rgb(0, 0, 0);
+    color: #ffffff;
+    font-weight: 500;
+    padding: 0.475rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #D1D5DB;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: background-color 0.2s, transform 0.1s;
 }

@@ -47,6 +47,8 @@ export default function MediaTracker() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [detailsOverview, setDetailsOverview] = useState(null);
   const [detailsData, setDetailsData] = useState(null);
+  const [sortOption, setSortOption] = useState("default");
+
 
   const openEditModal = (item) => {
   setPreviousTab(activeTab);
@@ -242,6 +244,37 @@ export default function MediaTracker() {
 
   // --- 4. VERPLAATSEN & UPDATEN ---
   
+  const sortResults = (results) => {
+    const sorted = [...results];
+
+    switch (sortOption) {
+      case "az":
+        sorted.sort((a, b) => (a.title || a.name).localeCompare(b.title || b.name));
+        break;
+      case "new-old":
+        sorted.sort(
+          (a, b) =>
+            new Date(b.release_date || b.first_air_date) -
+            new Date(a.release_date || a.first_air_date)
+        );
+        break;
+      case "best":
+        sorted.sort((a, b) => b.vote_average - a.vote_average);
+        break;
+      case "movie":
+        sorted.sort((a, b) => a.media_type.localeCompare(b.media_type));
+        break;
+      case "series":
+        sorted.sort((a, b) => b.media_type.localeCompare(a.media_type));
+        break;
+      default:
+        return results; // geen sort → standaard volgorde
+    }
+
+    return sorted;
+  };
+
+
   // Update status (bijv. van watchlist -> watching)
   const updateStatus = async (item, newStatus) => {
     // Optimistic UI update
@@ -503,23 +536,71 @@ export default function MediaTracker() {
           {/* --- TAB: WATCHLIST & ZOEKEN --- */}
           {activeTab === "watchlist" && (
             <div>
-              {/* Zoekbalk */}
-              <form onSubmit={searchMedia} className="form">
-                <input
-                  type="text"
-                  placeholder="Zoek een film of serie..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="zoekbalk"
-                />
-              </form>
+       {/* Zoekbalk + sort in één rij */}
+          <form onSubmit={searchMedia} className="form search-bar-wrapper" style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            marginBottom: "18px"
+          }}>
+            <input
+              type="text"
+              placeholder="Zoek een film of serie..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="zoekbalk"
+            />
+
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+              className="sort-select"
+              style={{
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                minWidth: "140px"
+              }}
+            >
+              <option value="default">Standaard</option>
+              <option value="az">A - Z</option>
+              <option value="new-old">Nieuw → Oud</option>
+              <option value="old-new">Oud → Nieuw</option>
+              <option value="best">Best beoordeeld</option>
+              <option value="movie">Films eerst</option>
+              <option value="series">Series eerst</option>
+            </select>
+          </form>
+              {isSearching && (
+                <div className="search-results-container">
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="animate-spin mr-2 text-purple-400" size={32} />
+                    <span className="text-slate-300 text-lg">Zoeken...</span>
+                  </div>
+                </div>
+              )}
+                            {/* Geen resultaten gevonden */}
+              {!isSearching && searchQuery && searchResults.length === 0 && (
+                <div className="search-results-container">
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Search className="text-slate-600 mb-4" size={48} />
+                    <h3 className="text-xl font-semibold text-slate-300 mb-2">
+                      Geen resultaten gevonden
+                    </h3>
+                    <p className="text-slate-500">
+                      Probeer een andere zoekterm voor "{searchQuery}"
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Zoekresultaten */}
               {searchResults.length > 0 && (
                 <div className="search-results-container">
                   <h3 className="results-title">Resultaten</h3>
+
                   <div className="results-grid">
-                    {searchResults.map((result) => (
+                    {sortResults(searchResults).map((result) => (
                       <div 
                         key={result.id} 
                         onClick={() => openDetailsModal(result, true)}
@@ -563,7 +644,7 @@ export default function MediaTracker() {
               {/* Watchlist Items */}
                 <h3 className="watchlist-titel">Watchlist</h3>
                 {watchlist.length === 0 ? (
-                  <p className="text-slate-500 italic text-center py-8">Je lijst is nog leeg.</p>
+                  <p className="tekst-leeg">Je lijst is nog leeg.</p>
                 ) : (
                   <div className="results-grid">
                     {watchlist.map((item) => (
@@ -632,7 +713,7 @@ export default function MediaTracker() {
                 </h2>
                 
                 {watching.length === 0 ? (
-                  <p className="text-slate-500 text-center py-10">Je kijkt momenteel niks.</p>
+                  <p className="tekst-leeg">Je kijkt momenteel niks.</p>
                 ) : (
                   // Gebruik de gemeenschappelijke klasse voor de grid lay-out
                   <div className="results-grid"> 
@@ -714,7 +795,7 @@ export default function MediaTracker() {
                   <h2 className="watchlist-titel">Geschiedenis</h2>
 
                   {watched.length === 0 ? (
-                    <p className="text-slate-500 italic text-center py-8">Nog niks bekeken.</p>
+                    <p className="tekst-leeg">Nog niks bekeken.</p>
                   ) : (
                     <div className="results-grid">
                       {watched.map((item) => (
@@ -875,8 +956,8 @@ export default function MediaTracker() {
                     <button onClick={closeDetailsModal} className="annuleren-knop">Sluit</button>
                     {openedFromSearch && (
                     <button 
-                      className="toevoegen-watchlist"
-                      onClick={() => addSearchResultToWatchlist(selectedItem)}
+                      className="annuleren-knop"
+                      onClick={() => { addSearchResultToWatchlist(selectedItem); closeDetailsModal(); }}
                     >
                       + Voeg toe aan watchlist
                     </button>
@@ -1053,7 +1134,7 @@ export default function MediaTracker() {
       )}
     </div>
     
-    <p className="footer-text">Koen Donkers  •  2025</p>
+    <p className="footer-text">KD  •  2025</p>
     </div>
   );
 }
