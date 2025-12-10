@@ -48,6 +48,12 @@ export default function MediaTracker() {
   const [detailsOverview, setDetailsOverview] = useState(null);
   const [detailsData, setDetailsData] = useState(null);
 
+  const openEditModal = (item) => {
+  setPreviousTab(activeTab);
+  setSelectedItem(item);
+  setActiveTab("edit");
+  };
+
   const formatRuntime = (minutes) => {
     if (minutes == null) return null;
     const h = Math.floor(minutes / 60);
