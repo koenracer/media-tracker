@@ -778,6 +778,7 @@ margin-bottom: 1rem;
     flex: 1;       /* CRUCIAAL: Dit zorgt dat hij alle overgebleven ruimte pakt */
     width: 100%;   /* Zorg dat hij de flex-ruimte ook echt vult */
     font-size: 16px;
+    height: 1.4rem;
 }
 
 .optionselect2 {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2, LogIn } from "lucide-react";
 import { db } from "./firebaseConfig";
 import {
@@ -21,6 +21,22 @@ import {
   clearLocalStorage,
 } from "./storageUtils";
 import { Listbox } from '@headlessui/react';
+
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 // --- CONSTANTEN & HELPERS (Buiten component voor performance) ---
 const TMDB_API_KEY = "c60432138621b30259eb888814e361ca"; // Tip: Verplaats naar .env bestand
@@ -67,6 +83,7 @@ export default function MediaTracker() {
 
   // Zoek & Sorteer states
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedSortOption, setSelectedSortOption] = useState(sortOptionsData[0]);
@@ -83,10 +100,10 @@ export default function MediaTracker() {
     return allItems.some(i => i.tmdb_id === tmdbId);
   }, [watchlist, watching, watched]);
 
-  // --- SORTEER FUNCTIE (Toegevoegd omdat deze ontbrak) ---
-  const sortResults = (results) => {
-    if (!results) return [];
-    const sorted = [...results];
+  // Sorteer functie voor zoekresultaten
+  const sortedSearchResults = useMemo(() => {
+    if (!searchResults || searchResults.length === 0) return [];
+    const sorted = [...searchResults];
     const option = selectedSortOption.value;
 
     switch (option) {
@@ -105,7 +122,7 @@ export default function MediaTracker() {
       default:
         return sorted;
     }
-  };
+  }, [searchResults, selectedSortOption]);
 
   // --- DATA MIGRATIE ---
   const migrateDataToFirestore = useCallback(async (localData) => {
@@ -226,15 +243,19 @@ export default function MediaTracker() {
   }, [user, authLoading, router, wasPreviouslyAnonymous, migrateDataToFirestore, fetchData]);
 
   // --- ZOEKEN ---
-  const searchMedia = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+useEffect(() => {
+  const performSearch = async () => {
+    if (!debouncedSearchQuery.trim()) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
 
     setIsSearching(true);
     setHasSearched(true);
     try {
       const response = await fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}&language=nl-NL`
+        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(debouncedSearchQuery)}&language=nl-NL`
       );
       if (!response.ok) throw new Error('Search failed');
       
@@ -250,6 +271,14 @@ export default function MediaTracker() {
       setIsSearching(false);
     }
   };
+
+  performSearch();
+}, [debouncedSearchQuery]);
+
+const searchMedia = (e) => {
+  e.preventDefault();
+  // Search gebeurt nu automatisch via useEffect
+};
 
   // --- TOEVOEGEN ---
   const addSearchResultToWatchlist = async (result) => {
@@ -620,7 +649,7 @@ export default function MediaTracker() {
                 <div className="search-results-container">
                   <h3 className="results-title">Resultaten</h3>
                   <div className="results-grid">
-                    {sortResults(searchResults).map((result) => (
+                    {sortedSearchResults.map((result) => (
                       <div 
                         key={result.id} 
                         onClick={() => openDetailsModal(result, true)}
@@ -628,7 +657,7 @@ export default function MediaTracker() {
                       >
                         <div className="poster-wrapper">
                           {result.poster_path ? (
-                            <img 
+                            <img loading="lazy"
                               src={`${IMAGE_BASE_URL}${result.poster_path}`} 
                               alt={`Poster van ${result.title || result.name}`} 
                             />
@@ -665,7 +694,7 @@ export default function MediaTracker() {
                     >
                       <div className="poster-wrapper">
                         {item.poster ? (
-                          <img src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
+                          <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
                         ) : (
                           <div className="no-image-placeholder">Geen Afbeelding</div>
                         )}
@@ -720,7 +749,7 @@ export default function MediaTracker() {
                     >
                       <div className="poster-wrapper">
                         {item.poster ? (
-                          <img src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
+                          <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
                         ) : (
                           <div className="no-image-placeholder">Geen Afbeelding</div>
                         )}
@@ -779,7 +808,7 @@ export default function MediaTracker() {
                     >
                       <div className="poster-wrapper">
                         {item.poster ? (
-                          <img src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
+                          <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
                         ) : (
                           <div className="no-image-placeholder">Geen Afbeelding</div>
                         )}
@@ -816,7 +845,7 @@ export default function MediaTracker() {
                   <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
                     <div className="poster-container">
                       {selectedItem.poster && (
-                        <img 
+                        <img loading="lazy"
                           src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
                           alt={selectedItem.name}
                           className="poster"
@@ -883,7 +912,7 @@ export default function MediaTracker() {
                               {detailsData.credits.cast.slice(0, 12).map((c, i) => (
                                 <div key={i} className="text-center min-w-[120px] cursor-pointer" onClick={(e) => openActorModal(c, e)}>
                                   {c.profile_path ? (
-                                    <img 
+                                    <img loading="lazy"
                                       src={`${IMAGE_BASE_URL}${c.profile_path}`} 
                                       alt={c.name}
                                       className="rounded-lg w-full h-auto object-cover mb-2 hover:opacity-80 transition-opacity"
@@ -930,7 +959,7 @@ export default function MediaTracker() {
                   <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
                     <div className="w-24 h-36 bg-slate-700 rounded-lg overflow-hidden shrink-0">
                       {selectedItem.poster && (
-                        <img 
+                        <img loading="lazy"
                           src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
                           alt={selectedItem.name}
                           className="poster"
