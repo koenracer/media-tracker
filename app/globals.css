@@ -896,3 +896,9 @@ margin-bottom: 1rem;
 .listbox-options::-webkit-scrollbar-thumb:hover {
   background: #4B5563;
 }
+
+.mx-3 {
+  margin-left: 0.75rem;
+  margin-right: 0.75rem;
+  font-weight: bold;
+}

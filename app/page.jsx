@@ -328,7 +328,7 @@ const searchMedia = (e) => {
   const updateStatus = async (item, newStatus) => {
     const updates = { status: newStatus };
     if (newStatus === 'watching') {
-      updates.time = item.type === 'film' ? "00:00" : null;
+      updates.time = "00:00";
       updates.season = item.type === 'serie' ? 1 : null;
       updates.episode = item.type === 'serie' ? 1 : null;
     }
@@ -813,9 +813,14 @@ const searchMedia = (e) => {
                         </div>
                         <div className="card-progress mt-3 pt-3 border-t border-slate-700/50">
                           <p className="text-xs text-slate-400 mb-3 text-center">
-                            {item.type === "film" 
-                              ? `Tijd: ${item.time || "00:00"}` 
-                              : `S${item.season || 1}-E${item.episode || 1}`}
+                          {item.type === "film" 
+                            ? `Tijd: ${item.time || "00:00"}` 
+                            : <>
+                              <span>S{item.season || 1} Afl.{item.episode || 1}</span>
+                              <span className="mx-3 text-slate-600">•</span> {/* mx-3 geeft ruimte links en rechts van de stip */}
+                              <span>{item.time || "00:00"}</span>
+                            </>
+                          }
                           </p>
                             <div className="voltooid-delete-buttons">
                               <motion.button 
@@ -1065,12 +1070,60 @@ const searchMedia = (e) => {
                     </div>
                   </div>
 
-                  <div className="p-8 space-y-8">
-                    {selectedItem.type === "film" ? (
-                      <div className="space-y-4">
-                        <div className="huidige-tijd-controls">
-                          <motion.button
-                          whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
+                  <div className="space-y-8">
+                    {/* Seizoen & Aflevering (Bestaande code) */}
+                    <div className="flex gap-4 justify-between">
+                      <div className="seizoen-blok flex-1">
+                          <label className="tijd block mb-2">Seizoen</label>
+                          <div className="seizoenblok flex items-center justify-between bg-slate-700/50 rounded-lg p-2">
+                            <button onClick={() => 
+                              updateProgress(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))} 
+                              className="min-knop">
+                                −
+                                </button>
+                            <div className="tijd-2">{selectedItem.season || 1}</div>
+                            <button
+                              onClick={() => {
+                                const nextSeason = (selectedItem.season || 1) + 1;
+                                updateProgress(selectedItem.id, "season", nextSeason);
+                                updateProgress(selectedItem.id, "episode", 1); // Reset naar aflevering 1
+                                updateProgress(selectedItem.id, "time", "00:00"); // Reset tijd
+                              }}
+                              className="plus-knop"
+                            >
+                              +
+                            </button>
+                          </div>
+                      </div>
+
+                      <div className="aflevering-blok flex-1">
+                          <label className="tijd block mb-2">Aflevering</label>
+                          <div className="afleveringblok flex items-center justify-between bg-slate-700/50 rounded-lg p-2">
+                            <button onClick={() => 
+                            updateProgress(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))} 
+                            className="min-knop">
+                              −
+                              </button>
+                            <div className="tijd-2">{selectedItem.episode || 1}</div>
+                            <button
+                              onClick={() => {
+                                const nextEpisode = (selectedItem.episode || 1) + 1;
+                                updateProgress(selectedItem.id, "episode", nextEpisode);
+                                updateProgress(selectedItem.id, "time", "00:00"); // Reset tijd naar 00:00
+                              }}
+                              className="plus-knop"
+                            >
+                              +
+                            </button>
+                          </div>
+                      </div>
+                    </div>
+
+                    {/* NIEUW: Tijd toevoegen voor series */}
+                    <div className="tijd-blok-serie pt-4 border-t border-slate-700/50">
+                        <label className="tijd block mb-2 text-center">Tijdstip in aflevering</label>
+                        <div className="huidige-tijd-controls flex justify-center items-center gap-4">
+                          <button
                             onClick={() => {
                               const currentTime = selectedItem.time || "00:00";
                               const [hours, minutes] = currentTime.split(":").map(Number);
@@ -1081,15 +1134,13 @@ const searchMedia = (e) => {
                               updateProgress(selectedItem.id, "time", newTime);
                             }}
                             className="min-knop"
-                            title="5 minuten terug"
                           >
                             −
-                          </motion.button>
-                          <div className="tijd-2 control-value">
+                          </button>
+                          <div className="tijd-2 control-value text-xl font-mono">
                             {selectedItem.time || "00:00"}
                           </div>
-                          <motion.button
-                          whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
+                          <button
                             onClick={() => {
                               const currentTime = selectedItem.time || "00:00";
                               const [hours, minutes] = currentTime.split(":").map(Number);
@@ -1100,61 +1151,11 @@ const searchMedia = (e) => {
                               updateProgress(selectedItem.id, "time", newTime);
                             }}
                             className="plus-knop"
-                            title="5 minuten vooruit"
                           >
                             +
-                          </motion.button>
+                          </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-8">
-                        <div className="seizoen-blok">
-                          <label className="tijd">Seizoen</label>
-                          <div className="seizoenblok">
-                            <motion.button
-                              onClick={() => updateProgress(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))}
-                              className="min-knop"
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              −
-                            </motion.button>
-                            <div className="tijd-2">
-                              {selectedItem.season || 1}
-                            </div>
-                            <motion.button
-                              onClick={() => updateProgress(selectedItem.id, "season", (selectedItem.season || 1) + 1)}
-                              className="plus-knop"
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              +
-                            </motion.button>
-                          </div>
-                        </div>
-
-                        <div className="aflevering-blok">
-                          <label className="tijd">Aflevering</label>
-                          <div className="afleveringblok">
-                            <motion.button
-                              onClick={() => updateProgress(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))}
-                              className="min-knop"
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              −
-                            </motion.button>
-                            <div className="tijd-2">
-                              {selectedItem.episode || 1}
-                            </div>
-                            <motion.button
-                              onClick={() => updateProgress(selectedItem.id, "episode", (selectedItem.episode || 1) + 1)}
-                              className="plus-knop"
-                              whileTap={{ scale: 0.9 }}
-                            >
-                              +
-                            </motion.button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
 
                   <div className="footer">
