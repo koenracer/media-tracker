@@ -39,8 +39,8 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-// --- CONSTANTEN & HELPERS (Buiten component voor performance) ---
-const TMDB_API_KEY = "c60432138621b30259eb888814e361ca"; // Tip: Verplaats naar .env bestand
+// sleutel voor TMDB API
+const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
 const formatRuntime = (minutes) => {
