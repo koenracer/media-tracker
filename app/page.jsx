@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2, LogIn } from "lucide-react";
 import { db } from "./firebaseConfig";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   collection,
   query,
@@ -574,19 +575,30 @@ const searchMedia = (e) => {
               { key: "watching", label: "Verder Kijken" },
               { key: "watched", label: "Klaar" },
             ].map((tab) => (
-              <button
+              <motion.button
+              whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={`tab ${activeTab === tab.key ? 'active' : ''}`} // Assuming you want an active class
               >
                 {tab.label}
-              </button>
+              </motion.button>
             ))}
           </div>
         )}
 
         <div className="container-watchlist">
-          {/* WATCHLIST TAB */}
+          <AnimatePresence mode="wait">
+    
+        {/* WATCHLIST TAB */}
+        {activeTab === "watchlist" && (
+          <motion.div
+            key="watchlist"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
           {activeTab === "watchlist" && (
             <div>
               <form onSubmit={searchMedia} className="form search-bar-wrapper" style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "18px" }}>
@@ -684,8 +696,20 @@ const searchMedia = (e) => {
               {watchlist.length === 0 ? (
                 <p className="tekst-leeg">Je lijst is nog leeg.</p>
               ) : (
-                <div className="results-grid">
+                <motion.div className="results-grid">
                   {watchlist.map((item) => (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.2 }}
+                      key={item.id} 
+                      id={`item-${item.id}`}
+                      className="media-card watchlist-item"
+                      onClick={() => openDetailsModal(item)}
+                      whileTap={{ scale: 0.98 }}
+                    >
                     <div 
                       key={item.id} 
                       id={`item-${item.id}`}
@@ -708,28 +732,41 @@ const searchMedia = (e) => {
                           <span>{item.year || ""}</span>
                         </div>
                         <div className="watchlist-actions">
-                          <button 
+                          <motion.button 
+                          whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                             onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watching'); }} 
                             className="start-button"
                           >
                             Start
-                          </button>
-                          <button 
+                          </motion.button>
+                          <motion.button 
+                            whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                             onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watchlist'); }} 
                             className="delete-button"
                           >
                             Verwijder
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               )}
             </div>
           )}
+          </motion.div>
+        )}
 
           {/* WATCHING TAB */}
+          {activeTab === "watching" && (
+            <motion.div
+              key="watching"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
           {activeTab === "watching" && (
             <div>
               <h2 className="nuaanhetkijken">
@@ -739,8 +776,20 @@ const searchMedia = (e) => {
               {watching.length === 0 ? (
                 <p className="tekst-leeg">Je kijkt momenteel niks.</p>
               ) : (
-                <div className="results-grid">
+                <motion.div className="results-grid">
                   {watching.map((item) => (
+                    <motion.div 
+                      layout // Zorgt voor de schuif-animatie bij verwijderen
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }} // Animatie bij verwijderen
+                      transition={{ duration: 0.2 }}
+                      key={item.id} 
+                      id={`item-${item.id}`}
+                      className="media-card watchlist-item"
+                      onClick={() => openEditModal(item)}
+                      whileTap={{ scale: 0.98 }} // Fijn effect op iPhone bij aantikken
+                    >
                     <div 
                       key={item.id} 
                       id={`item-${item.id}`}
@@ -769,37 +818,62 @@ const searchMedia = (e) => {
                               : `S${item.season || 1}-E${item.episode || 1}`}
                           </p>
                             <div className="voltooid-delete-buttons">
-                              <button 
+                              <motion.button 
                                 onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watched'); }}
                                 className="voltooid-button"
+                                whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                               >
                                 Klaar
-                              </button>
-                              <button 
+                              </motion.button>
+                              <motion.button 
                                 onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watching'); }}
                                 className="delete-button-2"
+                                whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                               >
                                 Verwijder
-                              </button>
+                              </motion.button>
                             </div>
                         </div>
                       </div>
                     </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               )}
             </div>
           )}
+          </motion.div>
+          )}
 
           {/* WATCHED TAB */}
+          {activeTab === "watched" && (
+            <motion.div
+              key="watched"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
           {activeTab === "watched" && (
             <div>
               <h2 className="watchlist-titel">Geschiedenis</h2>
               {watched.length === 0 ? (
                 <p className="tekst-leeg">Nog niks bekeken.</p>
               ) : (
-                <div className="results-grid">
+                <motion.div className="results-grid">
                   {watched.map((item) => (
+                    <motion.div 
+                        layout // Zorgt voor de schuif-animatie bij verwijderen
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }} // Animatie bij verwijderen
+                        transition={{ duration: 0.2 }}
+                        key={item.id} 
+                        id={`item-${item.id}`}
+                        className="media-card watchlist-item"
+                        onClick={() => openDetailsModal(item)}
+                        whileTap={{ scale: 0.98 }} // Fijn effect op iPhone bij aantikken
+                      >
                     <div 
                       key={item.id} 
                       id={`item-${item.id}`}
@@ -822,23 +896,40 @@ const searchMedia = (e) => {
                           <span>{item.year || ""}</span>
                         </div>
                         <div className="watchhistorie-actions">
-                          <button 
+                          <motion.button
+                            whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                             onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watched'); }}
                             className="delete-button"
                           >
                             Verwijder
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     </div>
+                    </motion.div>
                   ))}
-                </div>
+                </motion.div>
               )}
             </div>
           )}
+          </motion.div>
+          )}
+          </AnimatePresence>
 
           {/* DETAILS MODAL */}
           {activeTab === "details" && selectedItem && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 ... (jouw classes) ... z-50 p-4 ..."
+            >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="max-w-4xl mx-auto"
+              >
             <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 z-50 p-4 md:p-8 overflow-auto flex items-center justify-center">
               <div className="max-w-4xl mx-auto">
                 <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-2xl mx-auto">
@@ -935,21 +1026,24 @@ const searchMedia = (e) => {
                     </div>
                     
                     <div className="flex gap-3">
-                      <button onClick={closeDetailsModal} className="annuleren-knop">Sluit</button>
+                      <motion.button onClick={closeDetailsModal} className="annuleren-knop" whileTap={{ scale: 0.9 }}>Sluit</motion.button>
                       {openedFromSearch && (
-                        <button 
+                        <motion.button 
                           className="annuleren-knop"
                           onClick={() => { addSearchResultToWatchlist(selectedItem); closeDetailsModal(); }}
+                          whileTap={{ scale: 0.9 }}
                         >
                           + Voeg toe aan watchlist
-                        </button>
+                        </motion.button>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          </motion.div>
+        </motion.div>
+      )}
 
           {/* EDIT MODAL */}
           {activeTab === "edit" && selectedItem && (
@@ -957,7 +1051,7 @@ const searchMedia = (e) => {
               <div className="max-w-4xl mx-auto">
                 <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl overflow-hidden max-w-md mx-auto">
                   <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
-                    <div className="w-24 h-36 bg-slate-700 rounded-lg overflow-hidden shrink-0">
+                    <div className="poster-container">
                       {selectedItem.poster && (
                         <img loading="lazy"
                           src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
@@ -975,7 +1069,8 @@ const searchMedia = (e) => {
                     {selectedItem.type === "film" ? (
                       <div className="space-y-4">
                         <div className="huidige-tijd-controls">
-                          <button
+                          <motion.button
+                          whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                             onClick={() => {
                               const currentTime = selectedItem.time || "00:00";
                               const [hours, minutes] = currentTime.split(":").map(Number);
@@ -989,11 +1084,12 @@ const searchMedia = (e) => {
                             title="5 minuten terug"
                           >
                             −
-                          </button>
+                          </motion.button>
                           <div className="tijd-2 control-value">
                             {selectedItem.time || "00:00"}
                           </div>
-                          <button
+                          <motion.button
+                          whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
                             onClick={() => {
                               const currentTime = selectedItem.time || "00:00";
                               const [hours, minutes] = currentTime.split(":").map(Number);
@@ -1007,7 +1103,7 @@ const searchMedia = (e) => {
                             title="5 minuten vooruit"
                           >
                             +
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     ) : (
@@ -1015,42 +1111,46 @@ const searchMedia = (e) => {
                         <div className="seizoen-blok">
                           <label className="tijd">Seizoen</label>
                           <div className="seizoenblok">
-                            <button
+                            <motion.button
                               onClick={() => updateProgress(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))}
                               className="min-knop"
+                              whileTap={{ scale: 0.9 }}
                             >
                               −
-                            </button>
+                            </motion.button>
                             <div className="tijd-2">
                               {selectedItem.season || 1}
                             </div>
-                            <button
+                            <motion.button
                               onClick={() => updateProgress(selectedItem.id, "season", (selectedItem.season || 1) + 1)}
                               className="plus-knop"
+                              whileTap={{ scale: 0.9 }}
                             >
                               +
-                            </button>
+                            </motion.button>
                           </div>
                         </div>
 
                         <div className="aflevering-blok">
                           <label className="tijd">Aflevering</label>
                           <div className="afleveringblok">
-                            <button
+                            <motion.button
                               onClick={() => updateProgress(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))}
                               className="min-knop"
+                              whileTap={{ scale: 0.9 }}
                             >
                               −
-                            </button>
+                            </motion.button>
                             <div className="tijd-2">
                               {selectedItem.episode || 1}
                             </div>
-                            <button
+                            <motion.button
                               onClick={() => updateProgress(selectedItem.id, "episode", (selectedItem.episode || 1) + 1)}
                               className="plus-knop"
+                              whileTap={{ scale: 0.9 }}
                             >
                               +
-                            </button>
+                            </motion.button>
                           </div>
                         </div>
                       </div>
@@ -1058,12 +1158,12 @@ const searchMedia = (e) => {
                   </div>
 
                   <div className="footer">
-                    <button onClick={closeEditModal} className="annuleren-knop">
+                    <motion.button onClick={closeEditModal} className="annuleren-knop" whileTap={{ scale: 0.9 }}>
                       Annuleren
-                    </button>
-                    <button onClick={() => handleModalSave(selectedItem)} className="opslaan-knop">
+                    </motion.button>
+                    <motion.button onClick={() => handleModalSave(selectedItem)} className="opslaan-knop" whileTap={{ scale: 0.9 }}>
                       Opslaan
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </div>
@@ -1079,13 +1179,14 @@ const searchMedia = (e) => {
             <p className="center-footer-text">
               Je gebruikt momenteel een anoniem account. Je films worden opgeslagen op je computer, niet in de cloud.
             </p>
-            <button
+            <motion.button
+            whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
               onClick={() => router.push("/auth")}
               className="anoniem-naar-account-button"
             >
               <LogIn className="w-4 h-4" />
               Maak account aan & behoud je films
-            </button>
+            </motion.button>
           </div>
         )}
       </div>

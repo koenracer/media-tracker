@@ -129,11 +129,6 @@ body {
     transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
 }
 
-/* Hover effect */
-.media-card:hover {
-    transform: scale(1.05); /* hover:scale-105 */
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* hover:shadow-2xl */
-}
 
 
 /* Stijl voor de poster (met aspect ratio) */
