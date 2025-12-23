@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2, LogIn } from "lucide-react";
+import { Trash2, Check, Search, Tv, Film, ArrowRight, Loader2, LogIn, Star } from "lucide-react";
 import { db } from "./firebaseConfig";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -40,7 +40,7 @@ function useDebounce(value, delay) {
 }
 
 // sleutel voor TMDB API
-const TMDB_API_KEY = c60432138621b30259eb888814e361ca;
+const TMDB_API_KEY = "c60432138621b30259eb888814e361ca";
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
 const formatRuntime = (minutes) => {
@@ -70,6 +70,7 @@ export default function MediaTracker() {
   // Refs voor tracking
   const hasMigrated = useRef(false);
   const isMounting = useRef(true);
+  const saveTimeoutRef = useRef(null);
 
   // UI States
   const [activeTab, setActiveTab] = useState("watchlist");
@@ -275,6 +276,82 @@ useEffect(() => {
 
   performSearch();
 }, [debouncedSearchQuery]);
+
+// --- OPTIMISTIC UPDATE (SNELLER KLIKKEN) ---
+  const handleOptimisticUpdate = (id, field, value) => {
+    const normalizedValue = (field === 'season' || field === 'episode') 
+      ? Math.max(1, Number(value) || 1)
+      : value;
+
+    // 1. Directe UI update (zodat de gebruiker meteen resultaat ziet)
+    if (selectedItem && selectedItem.id === id) {
+      setSelectedItem(prev => ({ ...prev, [field]: normalizedValue }));
+    }
+
+    // Update ook de lijst op de achtergrond (watching state)
+    setWatching(prev => prev.map(item => 
+      item.id === id ? { ...item, [field]: normalizedValue } : item
+    ));
+
+    // 2. Database update uitstellen (Debounce)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      console.log("Opslaan naar database...", field, normalizedValue);
+      // Hier roepen we de échte database logica aan
+      try {
+        if (isAnonymousUser(user)) {
+           // Voor anonieme users: haal de NIEUWSTE state op om te saven
+           // (We moeten hier even een trucje doen omdat we in een timeout zitten)
+           const localData = loadFromLocalStorage();
+           const currentWatching = localData.watching || [];
+           const updatedWatching = currentWatching.map(item => 
+             item.id === id ? { ...item, [field]: normalizedValue } : item
+           );
+           saveToLocalStorage(localData.watchlist, updatedWatching, localData.watched);
+        } else {
+          const itemRef = doc(db, "media_items", id);
+          await updateDoc(itemRef, { [field]: normalizedValue });
+        }
+      } catch (err) {
+        console.error('Fout bij vertraagd opslaan:', err);
+      }
+    }, 1000); // Wacht 1000ms (1 seconde) na de laatste klik voordat we opslaan
+  };
+
+const handleRateItem = async (item, rating) => {
+    // Optimistic update
+    const updatedItem = { ...item, user_rating: rating };
+    
+    // Update de juiste lijst (waarschijnlijk 'watched')
+    if (item.status === 'watched') {
+      setWatched(prev => prev.map(i => i.id === item.id ? updatedItem : i));
+    }
+    
+    // Update geselecteerd item als die open staat
+    if (selectedItem && selectedItem.id === item.id) {
+        setSelectedItem(updatedItem);
+    }
+
+    try {
+      if (isAnonymousUser(user)) {
+        // Local storage logic
+        const localData = loadFromLocalStorage();
+        const updatedWatched = (localData.watched || []).map(i => 
+            i.id === item.id ? { ...i, user_rating: rating } : i
+        );
+        saveToLocalStorage(localData.watchlist, localData.watching, updatedWatched);
+      } else {
+        // Firestore logic
+        const itemRef = doc(db, "media_items", item.id);
+        await updateDoc(itemRef, { user_rating: rating });
+      }
+    } catch (error) {
+      console.error("Fout bij raten:", error);
+    }
+  };
 
 const searchMedia = (e) => {
   e.preventDefault();
@@ -868,16 +945,16 @@ const searchMedia = (e) => {
                 <motion.div className="results-grid">
                   {watched.map((item) => (
                     <motion.div 
-                        layout // Zorgt voor de schuif-animatie bij verwijderen
+                        layout
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }} // Animatie bij verwijderen
+                        exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ duration: 0.2 }}
                         key={item.id} 
                         id={`item-${item.id}`}
                         className="media-card watchlist-item"
                         onClick={() => openDetailsModal(item)}
-                        whileTap={{ scale: 0.98 }} // Fijn effect op iPhone bij aantikken
+                        whileTap={{ scale: 0.98 }}
                       >
                     <div 
                       key={item.id} 
@@ -898,6 +975,11 @@ const searchMedia = (e) => {
                           <span className={`media-badge ${item.type === 'film' ? 'badge-movie' : 'badge-series'}`}>
                             {item.type === 'film' ? 'Film' : 'Serie'}
                           </span>
+                          <span>{item.user_rating && (
+  <span className="flex items-center gap-1 text-amber-400 text-xs mt-1">
+    <Star size={12} fill="currentColor" /> {item.user_rating}/5
+  </span>
+)}</span>
                           <span>{item.year || ""}</span>
                         </div>
                         <div className="watchhistorie-actions">
@@ -1029,6 +1111,27 @@ const searchMedia = (e) => {
                         </div>
                       )}
                     </div>
+                      {selectedItem.status !== 'watchlist' && (
+                        <div className="rating-container mb-6 p-4 bg-slate-700/30 rounded-xl border border-slate-700/50">
+                          <p className="text-sm text-slate-400 mb-2">Jouw beoordeling:</p>
+                          <div className="flex gap-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => handleRateItem(selectedItem, star)}
+                                className="transition-transform hover:scale-110 focus:outline-none"
+                              >
+                                <Star 
+                                  size={28} 
+                                  fill={(selectedItem.user_rating || 0) >= star ? "#fbbf24" : "transparent"} 
+                                  color={(selectedItem.user_rating || 0) >= star ? "#fbbf24" : "#94a3b8"}
+                                  strokeWidth={1.5}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     
                     <div className="flex gap-3">
                       <motion.button onClick={closeDetailsModal} className="annuleren-knop" whileTap={{ scale: 0.9 }}>Sluit</motion.button>
@@ -1076,23 +1179,15 @@ const searchMedia = (e) => {
                       <div className="seizoen-blok flex-1">
                           <label className="tijd block mb-2">Seizoen</label>
                           <div className="seizoenblok flex items-center justify-between bg-slate-700/50 rounded-lg p-2">
-                            <button onClick={() => 
-                              updateProgress(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))} 
-                              className="min-knop">
-                                −
-                                </button>
-                            <div className="tijd-2">{selectedItem.season || 1}</div>
-                            <button
-                              onClick={() => {
-                                const nextSeason = (selectedItem.season || 1) + 1;
-                                updateProgress(selectedItem.id, "season", nextSeason);
-                                updateProgress(selectedItem.id, "episode", 1); // Reset naar aflevering 1
-                                updateProgress(selectedItem.id, "time", "00:00"); // Reset tijd
-                              }}
-                              className="plus-knop"
-                            >
-                              +
-                            </button>
+                          <button onClick={() => 
+                            handleOptimisticUpdate(selectedItem.id, "season", Math.max(1, (selectedItem.season || 1) - 1))} 
+                            className="min-knop"> − </button>
+                          <button onClick={() => {
+                              const nextSeason = (selectedItem.season || 1) + 1;
+                              handleOptimisticUpdate(selectedItem.id, "season", nextSeason);
+                              handleOptimisticUpdate(selectedItem.id, "episode", 1);
+                              handleOptimisticUpdate(selectedItem.id, "time", "00:00");
+                            }} className="plus-knop"> + </button>
                           </div>
                       </div>
 
@@ -1100,26 +1195,17 @@ const searchMedia = (e) => {
                           <label className="tijd block mb-2">Aflevering</label>
                           <div className="afleveringblok flex items-center justify-between bg-slate-700/50 rounded-lg p-2">
                             <button onClick={() => 
-                            updateProgress(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))} 
-                            className="min-knop">
-                              −
-                              </button>
-                            <div className="tijd-2">{selectedItem.episode || 1}</div>
-                            <button
-                              onClick={() => {
+                              handleOptimisticUpdate(selectedItem.id, "episode", Math.max(1, (selectedItem.episode || 1) - 1))} 
+                              className="min-knop"> − </button>
+                            <button onClick={() => {
                                 const nextEpisode = (selectedItem.episode || 1) + 1;
-                                updateProgress(selectedItem.id, "episode", nextEpisode);
-                                updateProgress(selectedItem.id, "time", "00:00"); // Reset tijd naar 00:00
-                              }}
-                              className="plus-knop"
-                            >
-                              +
-                            </button>
+                                handleOptimisticUpdate(selectedItem.id, "episode", nextEpisode);
+                                handleOptimisticUpdate(selectedItem.id, "time", "00:00");
+                              }} className="plus-knop"> + </button>
                           </div>
                       </div>
                     </div>
 
-                    {/* NIEUW: Tijd toevoegen voor series */}
                     <div className="tijd-blok-serie pt-4 border-t border-slate-700/50">
                         <label className="tijd block mb-2 text-center">Tijdstip in aflevering</label>
                         <div className="huidige-tijd-controls flex justify-center items-center gap-4">
@@ -1131,7 +1217,7 @@ const searchMedia = (e) => {
                               const newHours = Math.floor(totalMinutes / 60);
                               const newMins = totalMinutes % 60;
                               const newTime = `${newHours.toString().padStart(2, "0")}:${newMins.toString().padStart(2, "0")}`;
-                              updateProgress(selectedItem.id, "time", newTime);
+                              handleOptimisticUpdate(selectedItem.id, "time", newTime);
                             }}
                             className="min-knop"
                           >
@@ -1148,7 +1234,7 @@ const searchMedia = (e) => {
                               const newHours = Math.floor(totalMinutes / 60);
                               const newMins = totalMinutes % 60;
                               const newTime = `${newHours.toString().padStart(2, "0")}:${newMins.toString().padStart(2, "0")}`;
-                              updateProgress(selectedItem.id, "time", newTime);
+                              handleOptimisticUpdate(selectedItem.id, "time", newTime);
                             }}
                             className="plus-knop"
                           >
