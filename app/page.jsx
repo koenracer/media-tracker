@@ -320,37 +320,54 @@ useEffect(() => {
       }
     }, 1000); // Wacht 1000ms (1 seconde) na de laatste klik voordat we opslaan
   };
-
-const handleRateItem = async (item, rating) => {
-    // Optimistic update
-    const updatedItem = { ...item, user_rating: rating };
+  // --- RATING FUNCTIE MET SLIDER (1-10) ---
+  const handleRateItem = (ratingValue) => {
+    if (!selectedItem) return;
     
-    // Update de juiste lijst (waarschijnlijk 'watched')
-    if (item.status === 'watched') {
-      setWatched(prev => prev.map(i => i.id === item.id ? updatedItem : i));
-    }
+    // Zorg dat de waarde een getal is (bijv. 6.5 of 7)
+    const newRating = parseFloat(ratingValue);
+
+    // 1. Directe UI update (zodat de slider en het getal direct reageren)
+    setSelectedItem(prev => ({ ...prev, user_rating: newRating }));
+
+    // Update ook de lijst op de achtergrond (zodat je het terugziet in de lijst)
+    // We checken zowel 'watched', 'watching' als 'watchlist' voor de zekerheid
+    const updateList = (list) => list.map(item => 
+      item.id === selectedItem.id ? { ...item, user_rating: newRating } : item
+    );
     
-    // Update geselecteerd item als die open staat
-    if (selectedItem && selectedItem.id === item.id) {
-        setSelectedItem(updatedItem);
+    setWatched(prev => updateList(prev));
+    setWatching(prev => updateList(prev));
+    setWatchlist(prev => updateList(prev));
+
+    // 2. Database update uitstellen (Debounce)
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
 
-    try {
-      if (isAnonymousUser(user)) {
-        // Local storage logic
-        const localData = loadFromLocalStorage();
-        const updatedWatched = (localData.watched || []).map(i => 
-            i.id === item.id ? { ...i, user_rating: rating } : i
-        );
-        saveToLocalStorage(localData.watchlist, localData.watching, updatedWatched);
-      } else {
-        // Firestore logic
-        const itemRef = doc(db, "media_items", item.id);
-        await updateDoc(itemRef, { user_rating: rating });
+    saveTimeoutRef.current = setTimeout(async () => {
+      console.log("Rating opslaan:", newRating);
+      try {
+        if (isAnonymousUser(user)) {
+           const localData = loadFromLocalStorage();
+           // Update de rating in alle lijsten in local storage
+           const updateLocalList = (list) => (list || []).map(item => 
+             item.id === selectedItem.id ? { ...item, user_rating: newRating } : item
+           );
+           
+           saveToLocalStorage(
+             updateLocalList(localData.watchlist), 
+             updateLocalList(localData.watching), 
+             updateLocalList(localData.watched)
+           );
+        } else {
+          const itemRef = doc(db, "media_items", selectedItem.id);
+          await updateDoc(itemRef, { user_rating: newRating });
+        }
+      } catch (err) {
+        console.error('Fout bij opslaan rating:', err);
       }
-    } catch (error) {
-      console.error("Fout bij raten:", error);
-    }
+    }, 1000); // Wacht 1 seconde na het loslaten van de slider
   };
 
 const searchMedia = (e) => {
@@ -976,10 +993,10 @@ const searchMedia = (e) => {
                             {item.type === 'film' ? 'Film' : 'Serie'}
                           </span>
                           <span>{item.user_rating && (
-  <span className="flex items-center gap-1 text-amber-400 text-xs mt-1">
-    <Star size={12} fill="currentColor" /> {item.user_rating}/5
-  </span>
-)}</span>
+                            <span className="flex items-center gap-1 text-amber-400 text-xs mt-1">
+                              <Star size={12} fill="currentColor" /> {item.user_rating}/10
+                            </span>
+                          )}</span>
                           <span>{item.year || ""}</span>
                         </div>
                         <div className="watchhistorie-actions">
@@ -1062,6 +1079,32 @@ const searchMedia = (e) => {
                         {detailsData?.vote_average != null && (
                           <p><strong>Beoordeling:</strong> ⭐ {detailsData.vote_average.toFixed(1)} ({detailsData.vote_count || 0} stemmen)</p>
                         )}
+                        {selectedItem.status !== 'watchlist' && (
+                          <div className="rating-container my-6 p-5 bg-slate-700/30 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center">
+                            <p><strong>Jouw beoordeling:</strong></p>
+                            {/* De Ster en het Cijfer */}
+                            <div className="spacing">
+                              <span className="higher">⭐</span>
+                              <span>
+                                {selectedItem.user_rating ? selectedItem.user_rating : "-"}
+                                <span>/10</span>
+                              </span>
+                            </div>
+
+                            {/* De Slider */}
+                            <div className="w-full px-4">
+                              <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                step="0.1" // Hiermee kun je bijv. ook een 7.5 geven. Zet op "1" voor hele getallen.
+                                value={selectedItem.user_rating || 5} // Standaard op 5 als er nog geen rating is
+                                onChange={(e) => handleRateItem(e.target.value)}
+                                className="w-full h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                              />
+                            </div>
+                          </div>
+                        )}
                         {detailsData?.production_countries && detailsData.production_countries.length > 0 && (
                           <p><strong>Land:</strong> {detailsData.production_countries.map(c => c.name).join(', ')}</p>
                         )}
@@ -1111,28 +1154,6 @@ const searchMedia = (e) => {
                         </div>
                       )}
                     </div>
-                      {selectedItem.status !== 'watchlist' && (
-                        <div className="rating-container mb-6 p-4 bg-slate-700/30 rounded-xl border border-slate-700/50">
-                          <p className="text-sm text-slate-400 mb-2">Jouw beoordeling:</p>
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <button
-                                key={star}
-                                onClick={() => handleRateItem(selectedItem, star)}
-                                className="transition-transform hover:scale-110 focus:outline-none"
-                              >
-                                <Star 
-                                  size={28} 
-                                  fill={(selectedItem.user_rating || 0) >= star ? "#fbbf24" : "transparent"} 
-                                  color={(selectedItem.user_rating || 0) >= star ? "#fbbf24" : "#94a3b8"}
-                                  strokeWidth={1.5}
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    
                     <div className="flex gap-3">
                       <motion.button onClick={closeDetailsModal} className="annuleren-knop" whileTap={{ scale: 0.9 }}>Sluit</motion.button>
                       {openedFromSearch && (

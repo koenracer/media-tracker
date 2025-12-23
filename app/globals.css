@@ -902,3 +902,17 @@ margin-bottom: 1rem;
   margin-right: 0.75rem;
   font-weight: bold;
 }
+
+.spacing {
+text-indent: 0.1rem;
+}
+
+.higher{
+    display: inline-flex;
+    flex-direction: column;
+}
+.higher:after{
+    content: "";
+    height: 5px;
+    width: 10px;
+}
