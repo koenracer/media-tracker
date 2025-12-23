@@ -40,7 +40,7 @@ function useDebounce(value, delay) {
 }
 
 // sleutel voor TMDB API
-const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+const TMDB_API_KEY = c60432138621b30259eb888814e361ca;
 const IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w200";
 
 const formatRuntime = (minutes) => {
