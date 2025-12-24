@@ -96,6 +96,35 @@ export default function MediaTracker() {
   const [detailsData, setDetailsData] = useState(null);
   const [openedFromSearch, setOpenedFromSearch] = useState(false);
 
+  // Sortering voor de 'Watched' lijst
+  const [watchedSort, setWatchedSort] = useState('recent'); // 'recent' of 'rating'
+
+  const sortedWatched = useMemo(() => {
+    const list = [...watched];
+
+    if (watchedSort === 'recent') {
+      return list;
+    }
+
+    if (watchedSort === 'rating') {
+      return list.sort((a, b) => {
+        const ratingA = a.user_rating;
+        const ratingB = b.user_rating;
+
+        if (ratingA != null && ratingB != null) {
+          return ratingB - ratingA;
+        }
+
+        if (ratingA != null) return -1;
+
+        if (ratingB != null) return 1;
+        return 0;
+      });
+    }
+    
+    return list;
+  }, [watched, watchedSort]);
+
   // Functie om duplicaten te checken
   const isDuplicate = useCallback((tmdbId) => {
     const allItems = [...watchlist, ...watching, ...watched];
@@ -852,99 +881,7 @@ const searchMedia = (e) => {
           </motion.div>
         )}
 
-          {/* WATCHING TAB */}
-          {activeTab === "watching" && (
-            <motion.div
-              key="watching"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-          {activeTab === "watching" && (
-            <div>
-              <h2 className="nuaanhetkijken">
-                <span className="watchlist-titel">Nu aan het kijken</span>
-              </h2>
-              
-              {watching.length === 0 ? (
-                <p className="tekst-leeg">Je kijkt momenteel niks.</p>
-              ) : (
-                <motion.div className="results-grid">
-                  {watching.map((item) => (
-                    <motion.div 
-                      layout // Zorgt voor de schuif-animatie bij verwijderen
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }} // Animatie bij verwijderen
-                      transition={{ duration: 0.2 }}
-                      key={item.id} 
-                      id={`item-${item.id}`}
-                      className="media-card watchlist-item"
-                      onClick={() => openEditModal(item)}
-                      whileTap={{ scale: 0.98 }} // Fijn effect op iPhone bij aantikken
-                    >
-                    <div 
-                      key={item.id} 
-                      id={`item-${item.id}`}
-                      className="media-card watching-card cursor-pointer"
-                      onClick={() => openEditModal(item)}
-                    >
-                      <div className="poster-wrapper">
-                        {item.poster ? (
-                          <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
-                        ) : (
-                          <div className="no-image-placeholder">Geen Afbeelding</div>
-                        )}
-                      </div>
-                      <div className="card-content">
-                        <p className="card-title">{item.name}</p>
-                        <div className="metadata">
-                          <span className={`media-badge ${item.type === 'film' ? 'badge-movie' : 'badge-series'}`}>
-                            {item.type === 'film' ? 'Film' : 'Serie'}
-                          </span>
-                          <span>{item.year}</span>
-                        </div>
-                        <div className="card-progress mt-3 pt-3 border-t border-slate-700/50">
-                          <p className="text-xs text-slate-400 mb-3 text-center">
-                          {item.type === "film" 
-                            ? `Tijd: ${item.time || "00:00"}` 
-                            : <>
-                              <span>S{item.season || 1} Afl.{item.episode || 1}</span>
-                              <span className="mx-3 text-slate-600">•</span> {/* mx-3 geeft ruimte links en rechts van de stip */}
-                              <span>{item.time || "00:00"}</span>
-                            </>
-                          }
-                          </p>
-                            <div className="voltooid-delete-buttons">
-                              <motion.button 
-                                onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watched'); }}
-                                className="voltooid-button"
-                                whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
-                              >
-                                Klaar
-                              </motion.button>
-                              <motion.button 
-                                onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watching'); }}
-                                className="delete-button-2"
-                                whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
-                              >
-                                Verwijder
-                              </motion.button>
-                            </div>
-                        </div>
-                      </div>
-                    </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </div>
-          )}
-          </motion.div>
-          )}
-
-          {/* WATCHED TAB */}
+        {/* WATCHED TAB */}
           {activeTab === "watched" && (
             <motion.div
               key="watched"
@@ -953,19 +890,52 @@ const searchMedia = (e) => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-          {activeTab === "watched" && (
-            <div>
-              <h2 className="watchlist-titel">Geschiedenis</h2>
-              {watched.length === 0 ? (
-                <p className="tekst-leeg">Nog niks bekeken.</p>
-              ) : (
-                <motion.div className="results-grid">
-                  {watched.map((item) => (
-                    <motion.div 
-                        layout
+              <div>
+                {/* Header met Titel en Sorteerknop in dezelfde stijl als zoekresultaten */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h2 className="watchlist-titel" style={{ margin: 0 }}>Geschiedenis</h2>
+                  
+                  {watched.length > 0 && (
+                    <div className="optionselect2">
+                      <Listbox value={watchedSort} onChange={setWatchedSort}>
+                        <div className="custom-listbox">
+                          <Listbox.Button className="listbox-button">
+                             {/* Laat de juiste naam zien op basis van de state */}
+                            {watchedSort === 'recent' ? '📅 Recent gekeken' : '⭐ Rating (Hoog-Laag)'}
+                          </Listbox.Button>
+                          <Listbox.Options className="listbox-options">
+                            {/* De opties hardcoded in jouw stijl */}
+                            {[
+                              { id: 1, name: '📅 Recent gekeken', value: 'recent' },
+                              { id: 2, name: '⭐ Rating (Hoog-Laag)', value: 'rating' }
+                            ].map((option) => (
+                              <Listbox.Option key={option.id} value={option.value}>
+                                {({ selected }) => (
+                                  <li className="listbox-option">
+                                    {option.name}
+                                    {/* Check of deze optie geselecteerd is (active state check) */}
+                                    {watchedSort === option.value && <span style={{ float: 'right' }}>✓</span>}
+                                  </li>
+                                )}
+                              </Listbox.Option>
+                            ))}
+                          </Listbox.Options>
+                        </div>
+                      </Listbox>
+                    </div>
+                  )}
+                </div>
+
+                {sortedWatched.length === 0 ? (
+                  <p className="tekst-leeg">Nog niks bekeken.</p>
+                ) : (
+                  <motion.div className="results-grid">
+                    {sortedWatched.map((item) => (
+                      <motion.div 
+                        layout 
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
+                        exit={{ opacity: 0, scale: 0.9 }} 
                         transition={{ duration: 0.2 }}
                         key={item.id} 
                         id={`item-${item.id}`}
@@ -973,50 +943,69 @@ const searchMedia = (e) => {
                         onClick={() => openDetailsModal(item)}
                         whileTap={{ scale: 0.98 }}
                       >
-                    <div 
-                      key={item.id} 
-                      id={`item-${item.id}`}
-                      className="media-card watched-item"
-                      onClick={() => openDetailsModal(item)}
-                    >
-                      <div className="poster-wrapper">
-                        {item.poster ? (
-                          <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
-                        ) : (
-                          <div className="no-image-placeholder">Geen Afbeelding</div>
-                        )}
-                      </div>
-                      <div className="card-content">
-                        <p className="card-title">{item.name}</p>
-                        <div className="metadata">
-                          <span className={`media-badge ${item.type === 'film' ? 'badge-movie' : 'badge-series'}`}>
-                            {item.type === 'film' ? 'Film' : 'Serie'}
-                          </span>
-                          <span>{item.user_rating && (
-                            <span className="flex items-center gap-1 text-amber-400 text-xs mt-1">
-                              <Star size={12} fill="currentColor" /> {item.user_rating}/10
-                            </span>
-                          )}</span>
-                          <span>{item.year || ""}</span>
+                        <div className="media-card watched-item">
+                          
+                          {/* Poster Wrapper: Hier plaatsen we de rating IN */}
+                          <div className="poster-wrapper" style={{ position: 'relative' }}>
+                            {item.poster ? (
+                              <img loading="lazy" src={`${IMAGE_BASE_URL}${item.poster}`} alt={`Poster van ${item.name}`} />
+                            ) : (
+                              <div className="no-image-placeholder">Geen Afbeelding</div>
+                            )}
+                            
+                            {/* --- DE RATING BADGE --- */}
+                            {/* Deze wordt nu absoluut gepositioneerd BOVENOP de poster */}
+                            {item.user_rating && (
+                              <div 
+                                style={{
+                                  position: 'absolute',
+                                  top: '8px',
+                                  right: '8px',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.75)', // Donkere achtergrond voor leesbaarheid
+                                  color: '#fbbf24', // Goud/Geel
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  zIndex: 10, // Zorg dat hij altijd bovenop ligt
+                                  backdropFilter: 'blur(2px)', // Mooi blur effect
+                                  border: '1px solid rgba(251, 191, 36, 0.3)' // Subtiel randje
+                                }}
+                              >
+                                <Star size={12} fill="#fbbf24" strokeWidth={0} /> 
+                                {item.user_rating}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="card-content">
+                            <p className="card-title">{item.name}</p>
+                            <div className="metadata">
+                              <span className={`media-badge ${item.type === 'film' ? 'badge-movie' : 'badge-series'}`}>
+                                {item.type === 'film' ? 'Film' : 'Serie'}
+                              </span>
+                              <span>{item.year || ""}</span>
+                            </div>
+                            <div className="watchhistorie-actions">
+                              <motion.button
+                                whileTap={{ scale: 0.9 }} 
+                                onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watched'); }}
+                                className="delete-button"
+                              >
+                                Verwijder
+                              </motion.button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="watchhistorie-actions">
-                          <motion.button
-                            whileTap={{ scale: 0.9 }} // Knop wordt iets kleiner als je drukt
-                            onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watched'); }}
-                            className="delete-button"
-                          >
-                            Verwijder
-                          </motion.button>
-                        </div>
-                      </div>
-                    </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </div>
-          )}
-          </motion.div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
           )}
           </AnimatePresence>
 
@@ -1079,7 +1068,7 @@ const searchMedia = (e) => {
                         {detailsData?.vote_average != null && (
                           <p><strong>Beoordeling:</strong> ⭐ {detailsData.vote_average.toFixed(1)} ({detailsData.vote_count || 0} stemmen)</p>
                         )}
-                        {selectedItem.status !== 'watchlist' && (
+                        {!openedFromSearch && selectedItem.status !== 'watchlist' && (
                           <div className="rating-container my-6 p-5 bg-slate-700/30 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center">
                             <p><strong>Jouw beoordeling:</strong></p>
                             {/* De Ster en het Cijfer */}

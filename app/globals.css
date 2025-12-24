@@ -835,7 +835,7 @@ margin-bottom: 1rem;
 /* De container voor de opties */
 .listbox-options {
   position: absolute;
-  z-index: 10;
+  z-index: 50;
   margin-top: 8px;
   border-radius: 12px;
   border: 1px solid #374151;

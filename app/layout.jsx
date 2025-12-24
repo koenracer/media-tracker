@@ -3,8 +3,17 @@ import { AuthProvider } from "./AuthContext";
 import { Analytics } from "@vercel/analytics/next"
 
 export const metadata = {
-  title: "MediaTracker",
-  description: "Track je films & series",
+  title: "Media Tracker",
+  description: "Houdt bij welke films en series je kijkt",
+  manifest: "/manifest.json", // Verwijzing naar stap 2
+  icons: {
+    icon: "/icon-512.png",
+  },
+  appleWebApp: {
+    title: "MT",
+    statusBarStyle: "black-translucent",
+    capable: true,
+  },
 };
 
 export default function RootLayout({ children }) {

@@ -1,0 +1,16 @@
+{
+  "name": "Media Tracker",
+  "short_name": "MT",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait"
+}
