@@ -14,6 +14,7 @@ export const metadata = {
     statusBarStyle: "black-translucent",
     capable: true,
   },
+  link: { rel: "apple-touch-icon", href: "/icon-512.png" },
 };
 
 export default function RootLayout({ children }) {
