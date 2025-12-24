@@ -8,6 +8,7 @@ export const metadata = {
   manifest: "/manifest.json", // Verwijzing naar stap 2
   icons: {
     icon: "/icon-512.png",
+    apple: "/apple-touch-icon.png", // Dit is de belangrijkste voor je iPad!
   },
   appleWebApp: {
     title: "MT",
