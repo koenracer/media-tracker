@@ -278,6 +278,11 @@ export default function MediaTracker() {
       if (isAnonymousUser(user)) {
         console.log("👤 Anonieme gebruiker - laden van localStorage");
         const localData = loadFromLocalStorage();
+        console.log("📦 Geladen data:", {
+          watchlist: localData.watchlist?.length || 0,
+          watching: localData.watching?.length || 0,
+          watched: localData.watched?.length || 0
+        });
         setWatchlist(localData.watchlist || []);
         setWatching(localData.watching || []);
         setWatched(localData.watched || []);
@@ -293,6 +298,13 @@ export default function MediaTracker() {
           id: doc.id,
           ...doc.data()
         }));
+        
+        console.log("📦 Firestore data:", {
+          total: data.length,
+          watchlist: data.filter(item => item.status === 'watchlist').length,
+          watching: data.filter(item => item.status === 'watching').length,
+          watched: data.filter(item => item.status === 'watched').length
+        });
         
         setWatchlist(data.filter(item => item.status === 'watchlist'));
         setWatching(data.filter(item => item.status === 'watching'));
@@ -573,6 +585,8 @@ export default function MediaTracker() {
   };
 
   const updateStatus = async (item, newStatus) => {
+    console.log("🔄 Updating status:", item.name, "van", item.status, "naar", newStatus);
+    
     const updates = { status: newStatus };
     
     if (newStatus === 'watching') {
@@ -584,21 +598,28 @@ export default function MediaTracker() {
     const updatedItem = { ...item, ...updates };
     
     try {
-      // Optimistic UI update
-      if (item.status === 'watchlist') setWatchlist(prev => prev.filter(i => i.id !== item.id));
-      if (item.status === 'watching') setWatching(prev => prev.filter(i => i.id !== item.id));
-      if (item.status === 'watched') setWatched(prev => prev.filter(i => i.id !== item.id));
+      // Bereken nieuwe lijsten EERST
+      const currentWatchlist = watchlist.filter(i => i.id !== item.id);
+      const currentWatching = watching.filter(i => i.id !== item.id);
+      const currentWatched = watched.filter(i => i.id !== item.id);
       
-      if (newStatus === 'watchlist') setWatchlist(prev => [updatedItem, ...prev]);
-      if (newStatus === 'watching') setWatching(prev => [updatedItem, ...prev]);
-      if (newStatus === 'watched') setWatched(prev => [updatedItem, ...prev]);
+      const newWatchlist = newStatus === 'watchlist' ? [updatedItem, ...currentWatchlist] : currentWatchlist;
+      const newWatching = newStatus === 'watching' ? [updatedItem, ...currentWatching] : currentWatching;
+      const newWatched = newStatus === 'watched' ? [updatedItem, ...currentWatched] : currentWatched;
+      
+      console.log("✅ Nieuwe lijsten:", {
+        watchlist: newWatchlist.length,
+        watching: newWatching.length,
+        watched: newWatched.length
+      });
+      
+      // Update UI
+      setWatchlist(newWatchlist);
+      setWatching(newWatching);
+      setWatched(newWatched);
 
       // Persist
       if (isAnonymousUser(user)) {
-        const newWatchlist = newStatus === 'watchlist' ? [updatedItem, ...watchlist.filter(i => i.id !== item.id)] : watchlist.filter(i => i.id !== item.id);
-        const newWatching = newStatus === 'watching' ? [updatedItem, ...watching.filter(i => i.id !== item.id)] : watching.filter(i => i.id !== item.id);
-        const newWatched = newStatus === 'watched' ? [updatedItem, ...watched.filter(i => i.id !== item.id)] : watched.filter(i => i.id !== item.id);
-        
         saveToLocalStorage(newWatchlist, newWatching, newWatched);
       } else {
         if (item.id.toString().startsWith('temp_')) {
