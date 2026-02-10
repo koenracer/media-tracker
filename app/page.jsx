@@ -91,7 +91,7 @@ const formatRuntime = (minutes) => {
 export default function MediaTracker() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
-  
+
   // ============================================================================
   // REFS
   // ============================================================================
@@ -109,7 +109,7 @@ export default function MediaTracker() {
   const [wasPreviouslyAnonymous, setWasPreviouslyAnonymous] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState(null);
-  
+
   // ============================================================================
   // DATA STATE
   // ============================================================================
@@ -125,7 +125,7 @@ export default function MediaTracker() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedSortOption, setSelectedSortOption] = useState(sortOptionsData[0]);
-  
+
   // ============================================================================
   // MODAL STATE
   // ============================================================================
@@ -202,7 +202,7 @@ export default function MediaTracker() {
         return 0;
       });
     }
-    
+
     return list;
   }, [watched, watchedSort]);
 
@@ -220,11 +220,11 @@ export default function MediaTracker() {
 
     try {
       const allItems = [
-        ...(localData.watchlist || []), 
-        ...(localData.watching || []), 
+        ...(localData.watchlist || []),
+        ...(localData.watching || []),
         ...(localData.watched || [])
       ];
-      
+
       console.log("🔄 Migreren van", allItems.length, "items naar Firestore");
 
       if (allItems.length === 0) {
@@ -233,7 +233,7 @@ export default function MediaTracker() {
       }
 
       const results = await Promise.allSettled(
-        allItems.map(item => 
+        allItems.map(item =>
           addDoc(collection(db, "media_items"), {
             ...item,
             user_id: user.uid,
@@ -246,7 +246,7 @@ export default function MediaTracker() {
       const failed = results.filter(r => r.status === 'rejected').length;
 
       console.log(`✅ Migratie voltooid: ${successful} geslaagd, ${failed} mislukt`);
-      
+
       if (successful > 0) {
         clearLocalStorage();
         setWasPreviouslyAnonymous(false);
@@ -270,10 +270,10 @@ export default function MediaTracker() {
       setLoading(false);
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       if (isAnonymousUser(user)) {
         console.log("👤 Anonieme gebruiker - laden van localStorage");
@@ -298,14 +298,16 @@ export default function MediaTracker() {
           id: doc.id,
           ...doc.data()
         }));
-        
-        console.log("📦 Firestore data:", {
+
+        console.log("📦 All Firestore data retrieved:", data);
+        console.log("📊 Firestore data breakdown:", {
           total: data.length,
           watchlist: data.filter(item => item.status === 'watchlist').length,
           watching: data.filter(item => item.status === 'watching').length,
-          watched: data.filter(item => item.status === 'watched').length
+          watched: data.filter(item => item.status === 'watched').length,
+          noStatus: data.filter(item => !item.status).length
         });
-        
+
         setWatchlist(data.filter(item => item.status === 'watchlist'));
         setWatching(data.filter(item => item.status === 'watching'));
         setWatched(data.filter(item => item.status === 'watched'));
@@ -313,7 +315,7 @@ export default function MediaTracker() {
     } catch (err) {
       console.error("❌ Exception in fetchData:", err);
       setError("Fout bij het laden van je data. Probeer de pagina te vernieuwen.");
-      
+
       // Fallback naar localStorage
       if (!isAnonymousUser(user)) {
         const localData = loadFromLocalStorage();
@@ -333,7 +335,7 @@ export default function MediaTracker() {
   // Auth & Migration Effect
   useEffect(() => {
     if (authLoading) return;
-    
+
     if (!user) {
       router.push("/auth");
       return;
@@ -345,10 +347,10 @@ export default function MediaTracker() {
       hasCheckedMigration.current = true;
 
       const localData = loadFromLocalStorage();
-      const hasLocalData = (localData.watchlist?.length || 0) + 
-                          (localData.watching?.length || 0) + 
-                          (localData.watched?.length || 0) > 0;
-      
+      const hasLocalData = (localData.watchlist?.length || 0) +
+        (localData.watching?.length || 0) +
+        (localData.watched?.length || 0) > 0;
+
       // Als we een authenticated user hebben EN er is local data, migreer
       if (!isAnonymousUser(user) && hasLocalData && !hasMigrated.current) {
         console.log("🔄 Detectie van local data bij authenticated user - starten migratie");
@@ -377,14 +379,14 @@ export default function MediaTracker() {
       }
 
       setIsSearching(true);
-      
+
       try {
         const response = await fetch(
           `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(debouncedSearchQuery)}&language=nl-NL`
         );
-        
+
         if (!response.ok) throw new Error('Search failed');
-        
+
         const data = await response.json();
         const filtered = (data.results || []).filter(
           item => item.media_type === 'movie' || item.media_type === 'tv'
@@ -426,17 +428,17 @@ export default function MediaTracker() {
   // ============================================================================
 
   const handleOptimisticUpdate = useCallback((id, field, value, status = 'watching') => {
-    const normalizedValue = (field === 'season' || field === 'episode') 
+    const normalizedValue = (field === 'season' || field === 'episode')
       ? Math.max(1, Number(value) || 1)
       : value;
 
     // 1. Update selected item direct
-    setSelectedItem(prev => 
+    setSelectedItem(prev =>
       prev && prev.id === id ? { ...prev, [field]: normalizedValue } : prev
     );
 
     // 2. Update de juiste lijst op basis van status
-    const updateList = (prev) => prev.map(item => 
+    const updateList = (prev) => prev.filter(item => item && item.id).map(item =>
       item.id === id ? { ...item, [field]: normalizedValue } : item
     );
 
@@ -455,20 +457,20 @@ export default function MediaTracker() {
 
     saveTimeoutRef.current = setTimeout(async () => {
       console.log("💾 Opslaan naar database:", field, normalizedValue);
-      
+
       try {
         if (isAnonymousUser(user)) {
           // Gebruik de HUIDIGE state, niet localStorage
-          const currentWatchlist = status === 'watchlist' ? 
-            watchlist.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) : 
+          const currentWatchlist = status === 'watchlist' ?
+            watchlist.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) :
             watchlist;
-          
-          const currentWatching = status === 'watching' ? 
-            watching.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) : 
+
+          const currentWatching = status === 'watching' ?
+            watching.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) :
             watching;
-          
-          const currentWatched = status === 'watched' ? 
-            watched.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) : 
+
+          const currentWatched = status === 'watched' ?
+            watched.map(item => item.id === id ? { ...item, [field]: normalizedValue } : item) :
             watched;
 
           saveToLocalStorage(currentWatchlist, currentWatching, currentWatched);
@@ -486,17 +488,17 @@ export default function MediaTracker() {
   // Rating handler
   const handleRateItem = useCallback((ratingValue) => {
     if (!selectedItem) return;
-    
+
     const newRating = parseFloat(ratingValue);
 
     // 1. Update selected item
     setSelectedItem(prev => ({ ...prev, user_rating: newRating }));
 
     // 2. Update alleen de lijst waar het item in zit
-    const updateList = (list) => list.map(item => 
+    const updateList = (list) => list.filter(item => item && item.id).map(item =>
       item.id === selectedItem.id ? { ...item, user_rating: newRating } : item
     );
-    
+
     if (selectedItem.status === 'watched') {
       setWatched(updateList);
     } else if (selectedItem.status === 'watching') {
@@ -512,17 +514,17 @@ export default function MediaTracker() {
 
     saveTimeoutRef.current = setTimeout(async () => {
       console.log("💾 Rating opslaan:", newRating);
-      
+
       try {
         if (isAnonymousUser(user)) {
           const localData = loadFromLocalStorage();
-          const updateLocalList = (list) => (list || []).map(item => 
+          const updateLocalList = (list) => (list || []).map(item =>
             item.id === selectedItem.id ? { ...item, user_rating: newRating } : item
           );
-          
+
           saveToLocalStorage(
-            updateLocalList(localData.watchlist), 
-            updateLocalList(localData.watching), 
+            updateLocalList(localData.watchlist),
+            updateLocalList(localData.watching),
             updateLocalList(localData.watched)
           );
         } else {
@@ -542,7 +544,7 @@ export default function MediaTracker() {
 
   const addSearchResultToWatchlist = async (result) => {
     if (!user) return;
-    
+
     if (isDuplicate(result.id)) {
       setError("Deze staat al in een van je lijsten!");
       setTimeout(() => setError(null), 3000);
@@ -575,7 +577,7 @@ export default function MediaTracker() {
         });
         setWatchlist(prev => [{ id: docRef.id, ...newItem, user_id: user.uid }, ...prev]);
       }
-      
+
       setSearchResults([]);
       setSearchQuery("");
     } catch (error) {
@@ -586,9 +588,9 @@ export default function MediaTracker() {
 
   const updateStatus = async (item, newStatus) => {
     console.log("🔄 Updating status:", item.name, "van", item.status, "naar", newStatus);
-    
+
     const updates = { status: newStatus };
-    
+
     if (newStatus === 'watching') {
       updates.time = "00:00";
       updates.season = item.type === 'serie' ? 1 : null;
@@ -596,23 +598,23 @@ export default function MediaTracker() {
     }
 
     const updatedItem = { ...item, ...updates };
-    
+
     try {
       // Bereken nieuwe lijsten EERST
       const currentWatchlist = watchlist.filter(i => i.id !== item.id);
       const currentWatching = watching.filter(i => i.id !== item.id);
       const currentWatched = watched.filter(i => i.id !== item.id);
-      
+
       const newWatchlist = newStatus === 'watchlist' ? [updatedItem, ...currentWatchlist] : currentWatchlist;
       const newWatching = newStatus === 'watching' ? [updatedItem, ...currentWatching] : currentWatching;
       const newWatched = newStatus === 'watched' ? [updatedItem, ...currentWatched] : currentWatched;
-      
+
       console.log("✅ Nieuwe lijsten:", {
         watchlist: newWatchlist.length,
         watching: newWatching.length,
         watched: newWatched.length
       });
-      
+
       // Update UI
       setWatchlist(newWatchlist);
       setWatching(newWatching);
@@ -620,25 +622,36 @@ export default function MediaTracker() {
 
       // Persist
       if (isAnonymousUser(user)) {
+        console.log("💾 Saving to localStorage (anonymous user):", { newWatchlist: newWatchlist.length, newWatching: newWatching.length, newWatched: newWatched.length });
         saveToLocalStorage(newWatchlist, newWatching, newWatched);
       } else {
+        if (!item.id) {
+          console.error("❌ Item ID is missing:", item);
+          throw new Error("Item ID is required for Firestore update");
+        }
+
         if (item.id.toString().startsWith('temp_')) {
+          console.log("📝 Creating new Firestore doc (temp item):", item.id);
           const docRef = await addDoc(collection(db, "media_items"), {
             ...updatedItem,
             user_id: user.uid,
             created_at: new Date(),
           });
+          console.log("✅ Firestore doc created with ID:", docRef.id);
           const realItem = { ...updatedItem, id: docRef.id };
-          
-          if (newStatus === 'watching') setWatching(prev => prev.map(i => i.id === item.id ? realItem : i));
-          if (newStatus === 'watched') setWatched(prev => prev.map(i => i.id === item.id ? realItem : i));
-          if (newStatus === 'watchlist') setWatchlist(prev => prev.map(i => i.id === item.id ? realItem : i));
+
+          if (newStatus === 'watching') setWatching(prev => prev.filter(i => i?.id !== item.id).concat([realItem]));
+          if (newStatus === 'watched') setWatched(prev => prev.filter(i => i?.id !== item.id).concat([realItem]));
+          if (newStatus === 'watchlist') setWatchlist(prev => prev.filter(i => i?.id !== item.id).concat([realItem]));
         } else {
+          console.log("🔄 Updating Firestore doc:", item.id, "with", updates);
           const itemRef = doc(db, "media_items", item.id);
           await updateDoc(itemRef, updates);
+          console.log("✅ Firestore doc updated successfully");
         }
       }
-      
+
+      console.log("🎯 Switching to tab:", newStatus);
       setActiveTab(newStatus);
     } catch (error) {
       console.error("❌ Error updating status:", error);
@@ -671,7 +684,7 @@ export default function MediaTracker() {
         });
       }
 
-      if (!isAnonymousUser(user) && !id.toString().startsWith('temp_')) {
+      if (!isAnonymousUser(user) && id && !id.toString().startsWith('temp_')) {
         const itemRef = doc(db, "media_items", id);
         await deleteDoc(itemRef);
       }
@@ -700,7 +713,7 @@ export default function MediaTracker() {
   const openDetailsModal = async (item, fromSearch = false) => {
     setOpenedFromSearch(fromSearch);
     setPreviousTab(activeTab);
-    
+
     const normalizedItem = fromSearch ? {
       ...item,
       name: item.title || item.name,
@@ -709,7 +722,7 @@ export default function MediaTracker() {
       type: item.media_type === 'movie' ? 'film' : 'serie',
       tmdb_id: item.id
     } : item;
-    
+
     setSelectedItem(normalizedItem);
     setActiveTab("details");
     setDetailsOverview(null);
@@ -717,16 +730,16 @@ export default function MediaTracker() {
     setDetailsLoading(true);
 
     try {
-      const mediaType = fromSearch 
+      const mediaType = fromSearch
         ? (item.media_type === 'movie' ? 'movie' : 'tv')
         : (item.type === 'film' ? 'movie' : 'tv');
       const tmdbId = fromSearch ? item.id : item.tmdb_id;
-      
+
       if (tmdbId) {
         const res = await fetch(
           `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${TMDB_API_KEY}&language=nl-NL&append_to_response=credits,videos,images,external_ids`
         );
-        
+
         if (res.ok) {
           const data = await res.json();
           setDetailsData(data);
@@ -748,7 +761,7 @@ export default function MediaTracker() {
     setDetailsData(null);
     setOpenedFromSearch(false);
     setDetailsLoading(false);
-    
+
     if (selectedItem && !openedFromSearch) {
       setTimeout(() => {
         const element = document.getElementById(`item-${selectedItem.id}`);
@@ -772,7 +785,7 @@ export default function MediaTracker() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <Loader2 className="animate-spin mr-2" size={32} /> 
+        <Loader2 className="animate-spin mr-2" size={32} />
         <span className="text-lg">Laden...</span>
       </div>
     );
@@ -783,7 +796,7 @@ export default function MediaTracker() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <Loader2 className="animate-spin mr-2" size={32} /> 
+        <Loader2 className="animate-spin mr-2" size={32} />
         <span className="text-lg">Je lijst laden...</span>
       </div>
     );
@@ -837,7 +850,7 @@ export default function MediaTracker() {
 
         <div className="container-watchlist">
           <AnimatePresence mode="wait">
-            
+
             {/* ================================================================ */}
             {/* WATCHLIST TAB */}
             {/* ================================================================ */}
@@ -859,7 +872,7 @@ export default function MediaTracker() {
                     className="zoekbalk"
                     aria-label="Zoek films en series"
                   />
-                  
+
                   {searchResults.length > 0 && (
                     <div className="optionselect2">
                       <Listbox value={selectedSortOption} onChange={setSelectedSortOption}>
@@ -912,7 +925,7 @@ export default function MediaTracker() {
                     <h3 className="results-title">Resultaten</h3>
                     <div className="results-grid">
                       {sortedSearchResults.map((result) => (
-                        <motion.div 
+                        <motion.div
                           key={result.id}
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
@@ -923,10 +936,10 @@ export default function MediaTracker() {
                         >
                           <div className="poster-wrapper">
                             {result.poster_path ? (
-                              <img 
+                              <img
                                 loading="lazy"
-                                src={`${IMAGE_BASE_URL}${result.poster_path}`} 
-                                alt={`Poster van ${result.title || result.name}`} 
+                                src={`${IMAGE_BASE_URL}${result.poster_path}`}
+                                alt={`Poster van ${result.title || result.name}`}
                               />
                             ) : (
                               <div className="no-image-placeholder">Geen Afbeelding</div>
@@ -938,7 +951,7 @@ export default function MediaTracker() {
                               <span className={`media-badge ${result.media_type === 'movie' ? 'badge-movie' : 'badge-series'}`}>
                                 {result.media_type === 'movie' ? 'Film' : 'Serie'}
                               </span>
-                              <span>{(result.release_date || result.first_air_date || "").substring(0,4)}</span>
+                              <span>{(result.release_date || result.first_air_date || "").substring(0, 4)}</span>
                             </div>
                           </div>
                         </motion.div>
@@ -954,9 +967,9 @@ export default function MediaTracker() {
                 ) : (
                   <div className="results-grid">
                     {watchlist.map((item) => (
-                      <motion.div 
+                      <motion.div
                         layout
-                        key={item.id} 
+                        key={item.id}
                         id={`item-${item.id}`}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -969,10 +982,10 @@ export default function MediaTracker() {
                       >
                         <div className="poster-wrapper">
                           {item.poster ? (
-                            <img 
-                              loading="lazy" 
-                              src={`${IMAGE_BASE_URL}${item.poster}`} 
-                              alt={`Poster van ${item.name}`} 
+                            <img
+                              loading="lazy"
+                              src={`${IMAGE_BASE_URL}${item.poster}`}
+                              alt={`Poster van ${item.name}`}
                             />
                           ) : (
                             <div className="no-image-placeholder">Geen Afbeelding</div>
@@ -987,17 +1000,17 @@ export default function MediaTracker() {
                             <span>{item.year || ""}</span>
                           </div>
                           <div className="watchlist-actions">
-                            <motion.button 
+                            <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watching'); }} 
+                              onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watching'); }}
                               className="start-button"
                               aria-label={`Start ${item.name}`}
                             >
                               Start
                             </motion.button>
-                            <motion.button 
+                            <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watchlist'); }} 
+                              onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watchlist'); }}
                               className="delete-button"
                               aria-label={`Verwijder ${item.name}`}
                             >
@@ -1029,7 +1042,7 @@ export default function MediaTracker() {
                 ) : (
                   <div className="results-grid">
                     {watching.map((item) => (
-                      <motion.div 
+                      <motion.div
                         layout
                         key={item.id}
                         id={`item-${item.id}`}
@@ -1044,10 +1057,10 @@ export default function MediaTracker() {
                       >
                         <div className="poster-wrapper">
                           {item.poster ? (
-                            <img 
-                              loading="lazy" 
-                              src={`${IMAGE_BASE_URL}${item.poster}`} 
-                              alt={`Poster van ${item.name}`} 
+                            <img
+                              loading="lazy"
+                              src={`${IMAGE_BASE_URL}${item.poster}`}
+                              alt={`Poster van ${item.name}`}
                             />
                           ) : (
                             <div className="no-image-placeholder">Geen Afbeelding</div>
@@ -1061,7 +1074,7 @@ export default function MediaTracker() {
                             </span>
                             <span>{item.year || ""}</span>
                           </div>
-                          
+
                           {/* Progress Info */}
                           <div className="text-xs text-slate-400 mt-2">
                             {item.type === 'serie' ? (
@@ -1072,25 +1085,25 @@ export default function MediaTracker() {
                           </div>
 
                           <div className="watchlist-actions">
-                            <motion.button 
+                            <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); openEditModal(item); }} 
+                              onClick={(e) => { e.stopPropagation(); openEditModal(item); }}
                               className="start-button"
                               aria-label={`Bewerk voortgang van ${item.name}`}
                             >
                               Bewerk
                             </motion.button>
-                            <motion.button 
+                            <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watched'); }} 
+                              onClick={(e) => { e.stopPropagation(); updateStatus(item, 'watched'); }}
                               className="start-button"
                               aria-label={`Markeer ${item.name} als gezien`}
                             >
                               <Check size={16} />
                             </motion.button>
-                            <motion.button 
+                            <motion.button
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watching'); }} 
+                              onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watching'); }}
                               className="delete-button"
                               aria-label={`Verwijder ${item.name}`}
                             >
@@ -1118,7 +1131,7 @@ export default function MediaTracker() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h2 className="watchlist-titel" style={{ margin: 0 }}>Geschiedenis</h2>
-                  
+
                   {watched.length > 0 && (
                     <div className="optionselect2">
                       <Listbox value={watchedSort} onChange={setWatchedSort}>
@@ -1152,8 +1165,8 @@ export default function MediaTracker() {
                 ) : (
                   <div className="results-grid">
                     {sortedWatched.map((item) => (
-                      <motion.div 
-                        layout 
+                      <motion.div
+                        layout
                         key={item.id}
                         id={`item-${item.id}`}
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -1167,18 +1180,18 @@ export default function MediaTracker() {
                       >
                         <div className="poster-wrapper" style={{ position: 'relative' }}>
                           {item.poster ? (
-                            <img 
-                              loading="lazy" 
-                              src={`${IMAGE_BASE_URL}${item.poster}`} 
-                              alt={`Poster van ${item.name}`} 
+                            <img
+                              loading="lazy"
+                              src={`${IMAGE_BASE_URL}${item.poster}`}
+                              alt={`Poster van ${item.name}`}
                             />
                           ) : (
                             <div className="no-image-placeholder">Geen Afbeelding</div>
                           )}
-                          
+
                           {/* Rating Badge */}
                           {item.user_rating && (
-                            <div 
+                            <div
                               style={{
                                 position: 'absolute',
                                 top: '8px',
@@ -1197,12 +1210,12 @@ export default function MediaTracker() {
                                 border: '1px solid rgba(251, 191, 36, 0.3)'
                               }}
                             >
-                              <Star size={12} fill="#fbbf24" strokeWidth={0} /> 
+                              <Star size={12} fill="#fbbf24" strokeWidth={0} />
                               {item.user_rating}
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="card-content">
                           <p className="card-title">{item.name}</p>
                           <div className="metadata">
@@ -1213,7 +1226,7 @@ export default function MediaTracker() {
                           </div>
                           <div className="watchhistorie-actions">
                             <motion.button
-                              whileTap={{ scale: 0.9 }} 
+                              whileTap={{ scale: 0.9 }}
                               onClick={(e) => { e.stopPropagation(); deleteItem(item.id, 'watched'); }}
                               className="delete-button"
                               aria-label={`Verwijder ${item.name}`}
@@ -1234,13 +1247,13 @@ export default function MediaTracker() {
           {/* DETAILS MODAL */}
           {/* ================================================================ */}
           {activeTab === "details" && selectedItem && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 z-50 p-4 md:p-8 overflow-auto flex items-center justify-center"
             >
-              <motion.div 
+              <motion.div
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
@@ -1251,9 +1264,9 @@ export default function MediaTracker() {
                   <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
                     <div className="poster-container">
                       {selectedItem.poster && (
-                        <img 
+                        <img
                           loading="lazy"
-                          src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
+                          src={`${IMAGE_BASE_URL}${selectedItem.poster}`}
                           alt={selectedItem.name}
                           className="poster"
                         />
@@ -1346,10 +1359,10 @@ export default function MediaTracker() {
                           {detailsData?.homepage && (
                             <p>
                               <strong>Website:</strong>{' '}
-                              <a 
-                                href={detailsData.homepage} 
-                                target="_blank" 
-                                rel="noreferrer" 
+                              <a
+                                href={detailsData.homepage}
+                                target="_blank"
+                                rel="noreferrer"
                                 className="website-link"
                               >
                                 {detailsData.homepage}
@@ -1364,15 +1377,15 @@ export default function MediaTracker() {
                               <div className="overflow-x-auto">
                                 <div className="carrousel">
                                   {detailsData.credits.cast.slice(0, 12).map((c, i) => (
-                                    <div 
-                                      key={i} 
-                                      className="text-center min-w-[120px] cursor-pointer" 
+                                    <div
+                                      key={i}
+                                      className="text-center min-w-[120px] cursor-pointer"
                                       onClick={(e) => openActorModal(c, e)}
                                     >
                                       {c.profile_path ? (
-                                        <img 
+                                        <img
                                           loading="lazy"
-                                          src={`${IMAGE_BASE_URL}${c.profile_path}`} 
+                                          src={`${IMAGE_BASE_URL}${c.profile_path}`}
                                           alt={c.name}
                                           className="rounded-lg w-full h-auto object-cover mb-2 hover:opacity-80 transition-opacity"
                                         />
@@ -1397,20 +1410,20 @@ export default function MediaTracker() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                      <motion.button 
-                        onClick={closeDetailsModal} 
-                        className="annuleren-knop" 
+                      <motion.button
+                        onClick={closeDetailsModal}
+                        className="annuleren-knop"
                         whileTap={{ scale: 0.9 }}
                         aria-label="Sluit details"
                       >
                         Sluit
                       </motion.button>
                       {openedFromSearch && (
-                        <motion.button 
+                        <motion.button
                           className="opslaan-knop"
-                          onClick={() => { 
-                            addSearchResultToWatchlist(selectedItem); 
-                            closeDetailsModal(); 
+                          onClick={() => {
+                            addSearchResultToWatchlist(selectedItem);
+                            closeDetailsModal();
                           }}
                           whileTap={{ scale: 0.9 }}
                           aria-label="Voeg toe aan watchlist"
@@ -1446,9 +1459,9 @@ export default function MediaTracker() {
                   <div className="p-6 border-b border-slate-700/50 flex items-center gap-4 bg-gradient-to-r from-slate-800 to-slate-900">
                     <div className="poster-container">
                       {selectedItem.poster && (
-                        <img 
+                        <img
                           loading="lazy"
-                          src={`${IMAGE_BASE_URL}${selectedItem.poster}`} 
+                          src={`${IMAGE_BASE_URL}${selectedItem.poster}`}
                           alt={selectedItem.name}
                           className="poster"
                         />
@@ -1468,14 +1481,14 @@ export default function MediaTracker() {
                           <div className="seizoen-blok flex-1">
                             <label className="tijd block mb-2 text-center">Seizoen</label>
                             <div className="seizoenblok flex items-center justify-center bg-slate-700/50 rounded-lg p-3">
-                              <motion.button 
+                              <motion.button
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => handleOptimisticUpdate(
-                                  selectedItem.id, 
-                                  "season", 
+                                  selectedItem.id,
+                                  "season",
                                   Math.max(1, (selectedItem.season || 1) - 1),
                                   'watching'
-                                )} 
+                                )}
                                 className="min-knop"
                                 aria-label="Verlaag seizoen"
                               >
@@ -1484,14 +1497,14 @@ export default function MediaTracker() {
                               <span className="text-2xl font-bold mx-4 min-w-[40px] text-center">
                                 {selectedItem.season || 1}
                               </span>
-                              <motion.button 
+                              <motion.button
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => {
                                   const nextSeason = (selectedItem.season || 1) + 1;
                                   handleOptimisticUpdate(selectedItem.id, "season", nextSeason, 'watching');
                                   handleOptimisticUpdate(selectedItem.id, "episode", 1, 'watching');
                                   handleOptimisticUpdate(selectedItem.id, "time", "00:00", 'watching');
-                                }} 
+                                }}
                                 className="plus-knop"
                                 aria-label="Verhoog seizoen"
                               >
@@ -1503,14 +1516,14 @@ export default function MediaTracker() {
                           <div className="aflevering-blok flex-1">
                             <label className="tijd block mb-2 text-center">Aflevering</label>
                             <div className="afleveringblok flex items-center justify-center bg-slate-700/50 rounded-lg p-3">
-                              <motion.button 
+                              <motion.button
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => handleOptimisticUpdate(
-                                  selectedItem.id, 
-                                  "episode", 
+                                  selectedItem.id,
+                                  "episode",
                                   Math.max(1, (selectedItem.episode || 1) - 1),
                                   'watching'
-                                )} 
+                                )}
                                 className="min-knop"
                                 aria-label="Verlaag aflevering"
                               >
@@ -1519,13 +1532,13 @@ export default function MediaTracker() {
                               <span className="text-2xl font-bold mx-4 min-w-[40px] text-center">
                                 {selectedItem.episode || 1}
                               </span>
-                              <motion.button 
+                              <motion.button
                                 whileTap={{ scale: 0.9 }}
                                 onClick={() => {
                                   const nextEpisode = (selectedItem.episode || 1) + 1;
                                   handleOptimisticUpdate(selectedItem.id, "episode", nextEpisode, 'watching');
                                   handleOptimisticUpdate(selectedItem.id, "time", "00:00", 'watching');
-                                }} 
+                                }}
                                 className="plus-knop"
                                 aria-label="Verhoog aflevering"
                               >
@@ -1624,9 +1637,9 @@ export default function MediaTracker() {
 
                   {/* Footer */}
                   <div className="footer p-6 border-t border-slate-700/50 flex gap-3">
-                    <motion.button 
-                      onClick={closeEditModal} 
-                      className="annuleren-knop flex-1" 
+                    <motion.button
+                      onClick={closeEditModal}
+                      className="annuleren-knop flex-1"
                       whileTap={{ scale: 0.9 }}
                       aria-label="Annuleer en sluit"
                     >
@@ -1643,7 +1656,7 @@ export default function MediaTracker() {
       {/* Footer - Anonymous User Prompt */}
       <div className="max-w-4xl mx-auto px-4">
         {isAnonymousUser(user) && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8 p-4 bg-gradient-to-r from-purple-900 to-slate-800 border border-purple-500/50 rounded-lg"
@@ -1663,7 +1676,7 @@ export default function MediaTracker() {
           </motion.div>
         )}
       </div>
-      
+
       <p className="footer-text">KD • 2025</p>
     </div>
   );
